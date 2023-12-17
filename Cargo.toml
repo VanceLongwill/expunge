@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "redact",
+    "redact_derive",
+]
+resolver = "2"
