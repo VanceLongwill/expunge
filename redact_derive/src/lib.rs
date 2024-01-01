@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
     parse_macro_input, parse_quote, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
-    Expr, Fields, GenericParam, Generics, Index, Meta, MetaList, Path,
+    Expr, Fields, GenericParam, Generics, Meta,
 };
 
 #[proc_macro_derive(Redact, attributes(redact))]
@@ -36,7 +36,6 @@ fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
         impl #impl_generics redact::Redact for #name #ty_generics #where_clause {
             fn redact(self) -> Self {
                 use ::redact::*;
-                use ::redact::redacter::*;
 
                 let mut next = self;
 
@@ -50,7 +49,7 @@ fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     Ok(expanded)
 }
 
-// Add a bound `T: HeapSize` to every type parameter T.
+// Add a bound `T: redact::Redact` to every type parameter T.
 fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
@@ -97,34 +96,19 @@ fn derive_struct(s: DataStruct) -> Result<TokenStream, syn::Error> {
 
                     if matches!(attr.meta, Meta::Path(..)) {
                         return Ok(quote! {
-                            next.#ident = DefaultRedacter.redact(next.#ident);
+                            next.#ident = next.#ident.redact();
                         });
                     }
 
                     //let list = attr.meta.require_list()?;
-                    attr.parse_nested_meta(|mut meta| {
+                    attr.parse_nested_meta(|meta| {
                         if meta.path.is_ident("as") {
                             let expr: Expr = meta.value()?.parse()?;
                             attr_as = Some(expr.into_token_stream());
                             Ok(())
-                            //match expr {
-                            //    Expr::Lit(v) => {
-                            //        attr_as = Some(v.into_token_stream());
-                            //        Ok(())
-                            //    }
-                            //    expr => Err(syn::Error::new(
-                            //        expr.span(),
-                            //        format!("`as` expects a literal, got {:?}", expr),
-                            //    )),
-                            //}
                         } else if meta.path.is_ident("with") {
                             let expr: Expr = meta.value()?.parse()?;
                             attr_with = Some(expr.into_token_stream());
-                            //let expr: syn::Expr = meta.value()?.parse()?;
-                            //let mut value = &expr;
-                            //while let syn::Expr::Group(e) = value {
-                            //    value = &e.expr;
-                            //}
                             Ok(())
                         } else {
                             Err(syn::Error::new(
@@ -132,20 +116,6 @@ fn derive_struct(s: DataStruct) -> Result<TokenStream, syn::Error> {
                                 format!("unrecognized option `{:?}`", meta.path),
                             ))
                         }
-                        //else if meta.path.is_ident("with") {
-                        //    let expr: Expr = meta.value()?.parse()?;
-                        //    match expr {
-                        //        Expr::Lit(v) => {
-                        //            attr_as = Some(v.into_token_stream());
-                        //            Ok(())
-                        //        }
-                        //        expr => Err(syn::Error::new(
-                        //            expr.span(),
-                        //            format!("`as` expects a literal, got {}", expr),
-                        //        )),
-                        //    }
-                        //}
-                        // Ok(())
                     })?;
 
                     match (attr_as, attr_with) {
@@ -156,37 +126,21 @@ fn derive_struct(s: DataStruct) -> Result<TokenStream, syn::Error> {
                             next.#ident = #attr_with(next.#ident);
                         }),
                         (None, None) => Ok(quote_spanned! { span =>
-                            next.#ident = DefaultRedacter.redact(next.#ident);
+                            next.#ident = next.#ident.redact();
                         }),
                         _ => Err(syn::Error::new(
                             span,
                             "unsupported combination of attributes",
                         )),
                     }?
-                    // @TODO
                 }),
                 n => Err(syn::Error::new(
                     span,
                     format!("expected 1 or 0 `redact` tags, found {n}"),
                 )),
             }
-
-            //(
-            //    quote! {
-            //        #ident: Redacted<#ty>,
-            //    },
-            //    quote! {
-            //        #ident: Redacted::new(self.#ident),
-            //    },
-            //)
-            //quote! {
-            //    next.#ident = next.#ident.redact();
-            //}
         })
         .collect()
-    //.unzip();
-
-    //Ok(TokenStream::from_iter(assigns))
 }
 
 fn derive_enum(e: DataEnum) -> Result<TokenStream, syn::Error> {

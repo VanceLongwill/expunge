@@ -1,24 +1,20 @@
 use redact::Redact;
 use sha256::digest;
 
-fn assert_default<T>(got: T)
-where
-    T: Default + std::cmp::PartialEq + std::fmt::Debug,
-{
-    assert_eq!(T::default(), got);
-}
-
 #[test]
 fn it_works() {
     #[derive(Clone, Redact)]
     struct User {
         #[redact]
         pub first_name: String,
+        #[redact]
+        pub middle_name: Option<String>,
         #[redact(as = "anon.".to_string())]
         pub last_name: String,
         #[redact(with = digest)]
         pub address: String,
         pub id: u64,
+        #[redact]
         pub location: Location,
     }
 
@@ -30,6 +26,7 @@ fn it_works() {
 
     let user = User {
         first_name: "Bob".to_string(),
+        middle_name: Some("James".to_string()),
         last_name: "Smith".to_string(),
         address: "101 Some Street".to_string(),
         id: 99,
@@ -46,6 +43,12 @@ fn it_works() {
     assert_eq!(
         "", redacted.location.city,
         "it should redact nested structs"
+    );
+
+    assert_eq!(
+        Some("".to_string()),
+        redacted.middle_name,
+        "it should redact optional values"
     );
 
     assert_eq!(
