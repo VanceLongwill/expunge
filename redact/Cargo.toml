@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 redact_derive = { path = "../redact_derive"}
+
+[dev-dependencies]
+sha256 = "1.4.0"
