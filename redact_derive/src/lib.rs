@@ -1,10 +1,10 @@
 extern crate proc_macro;
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
-    parse_macro_input, parse_quote, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
-    Expr, Fields, GenericParam, Generics, Index, Meta,
+    parse_macro_input, parse_quote, spanned::Spanned, Attribute, Data, DataEnum, DataStruct,
+    DeriveInput, Expr, Fields, GenericParam, Generics, Index, Meta,
 };
 
 #[proc_macro_derive(Redact, attributes(redact))]
@@ -19,7 +19,7 @@ pub fn redact_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let impls = match input.data {
         Data::Struct(s) => derive_struct(s, false)?,
-        Data::Enum(e) => derive_enum(e)?,
+        Data::Enum(e) => derive_enum(e, false)?,
         Data::Union(_) => {
             return Err(syn::Error::new(
                 input.ident.span(),
@@ -59,13 +59,82 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
     generics
 }
 
-fn derive_struct(s: DataStruct, redact_all: bool) -> Result<TokenStream, syn::Error> {
-    let span = s.struct_token.span;
+fn parse_attrs(
+    span: Span,
+    redact_all: bool,
+    ident: TokenStream,
+    attrs: Vec<Attribute>,
+) -> Result<TokenStream, syn::Error> {
+    let attrs: Vec<_> = attrs
+        .into_iter()
+        .filter(|attr| attr.path().is_ident("redact"))
+        .collect();
 
+    match attrs.len() {
+        0 if redact_all => Ok(quote! {
+            next.#ident = next.#ident.redact();
+        }),
+        0 if !redact_all => Ok(TokenStream::default()),
+        1 => Ok({
+            let attr = &attrs[0];
+            let span = attr.span();
+            let mut attr_as: Option<TokenStream> = None;
+            let mut attr_with: Option<TokenStream> = None;
+
+            if matches!(attr.meta, Meta::Path(..)) {
+                return Ok(quote! {
+                    next.#ident = next.#ident.redact();
+                });
+            }
+
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("as") {
+                    let expr: Expr = meta.value()?.parse()?;
+                    attr_as = Some(expr.into_token_stream());
+                    Ok(())
+                } else if meta.path.is_ident("with") {
+                    let expr: Expr = meta.value()?.parse()?;
+                    attr_with = Some(expr.into_token_stream());
+                    Ok(())
+                } else {
+                    Err(syn::Error::new(
+                        meta.path.span(),
+                        format!("unrecognized option `{:?}`", meta.path),
+                    ))
+                }
+            })?;
+
+            match (attr_as, attr_with) {
+                (Some(attr_as), None) => Ok(quote_spanned! { span =>
+                    next.#ident = #attr_as;
+                }),
+                (None, Some(attr_with)) => Ok(quote_spanned! { span =>
+                    next.#ident = #attr_with(next.#ident);
+                }),
+                (None, None) => Ok(quote_spanned! { span =>
+                    next.#ident = next.#ident.redact();
+                }),
+                _ => Err(syn::Error::new(
+                    span,
+                    "unsupported combination of attributes",
+                )),
+            }?
+        }),
+        n => Err(syn::Error::new(
+            span,
+            format!("expected 1 or 0 `redact` tags, found {n}"),
+        )),
+    }
+}
+
+fn derive_struct(s: DataStruct, redact_all: bool) -> Result<TokenStream, syn::Error> {
     let fields_named = match s.fields {
         Fields::Named(named) => Ok(named.named),
         Fields::Unnamed(unnamed) => Ok(unnamed.unnamed),
-        Fields::Unit => Err(syn::Error::new(span, "Unit structs are not supported")),
+        unit @ Fields::Unit => Err(syn::Error::new(
+            unit.span(),
+            "Unit structs are not supported",
+        )),
     }?;
 
     fields_named
@@ -80,72 +149,21 @@ fn derive_struct(s: DataStruct, redact_all: bool) -> Result<TokenStream, syn::Er
                     quote! { #index }
                 }
             };
-
-            let attrs: Vec<_> = field
-                .attrs
-                .into_iter()
-                .filter(|attr| attr.path().is_ident("redact"))
-                .collect();
-
-            match attrs.len() {
-                0 if redact_all => Ok(quote! {
-                    next.#ident = next.#ident.redact();
-                }),
-                0 if !redact_all => Ok(TokenStream::default()),
-                1 => Ok({
-                    let attr = &attrs[0];
-                    let span = attr.span();
-                    let mut attr_as: Option<TokenStream> = None;
-                    let mut attr_with: Option<TokenStream> = None;
-
-                    if matches!(attr.meta, Meta::Path(..)) {
-                        return Ok(quote! {
-                            next.#ident = next.#ident.redact();
-                        });
-                    }
-
-                    attr.parse_nested_meta(|meta| {
-                        if meta.path.is_ident("as") {
-                            let expr: Expr = meta.value()?.parse()?;
-                            attr_as = Some(expr.into_token_stream());
-                            Ok(())
-                        } else if meta.path.is_ident("with") {
-                            let expr: Expr = meta.value()?.parse()?;
-                            attr_with = Some(expr.into_token_stream());
-                            Ok(())
-                        } else {
-                            Err(syn::Error::new(
-                                meta.path.span(),
-                                format!("unrecognized option `{:?}`", meta.path),
-                            ))
-                        }
-                    })?;
-
-                    match (attr_as, attr_with) {
-                        (Some(attr_as), None) => Ok(quote_spanned! { span =>
-                            next.#ident = #attr_as;
-                        }),
-                        (None, Some(attr_with)) => Ok(quote_spanned! { span =>
-                            next.#ident = #attr_with(next.#ident);
-                        }),
-                        (None, None) => Ok(quote_spanned! { span =>
-                            next.#ident = next.#ident.redact();
-                        }),
-                        _ => Err(syn::Error::new(
-                            span,
-                            "unsupported combination of attributes",
-                        )),
-                    }?
-                }),
-                n => Err(syn::Error::new(
-                    span,
-                    format!("expected 1 or 0 `redact` tags, found {n}"),
-                )),
-            }
+            parse_attrs(span, redact_all, ident, field.attrs)
         })
         .collect()
 }
 
-fn derive_enum(e: DataEnum) -> Result<TokenStream, syn::Error> {
-    Ok(quote!().into_token_stream())
+fn derive_enum(e: DataEnum, redact_all: bool) -> Result<TokenStream, syn::Error> {
+    let span = e.enum_token.span();
+
+    e.variants
+        .into_iter()
+        .map(|variant| {
+            let span = variant.span();
+            let ident = variant.ident.into_token_stream();
+
+            parse_attrs(span, redact_all, ident, variant.attrs)
+        })
+        .collect()
 }

@@ -77,10 +77,10 @@ fn it_works_struct() {
 
 #[test]
 fn it_works_unnamed_struct() {
-    #[derive(Clone, Redact)]
+    #[derive(Redact)]
     struct User(String, #[redact] Location);
 
-    #[derive(Clone, Redact)]
+    #[derive(Redact)]
     struct Location {
         #[redact]
         city: String,
@@ -93,10 +93,30 @@ fn it_works_unnamed_struct() {
         },
     );
 
-    let original = user.clone();
-
     let redacted = user.redact();
 
     assert_eq!("Bob", redacted.0);
     assert_eq!("", redacted.1.city,);
+}
+
+#[test]
+fn it_works_enum() {
+    #[derive(PartialEq, Debug, Clone, Redact)]
+    enum SensitiveItem {
+        #[redact]
+        Name(String),
+        DateOfBirth(String),
+    }
+
+    #[derive(Clone, Redact)]
+    struct Location {
+        #[redact]
+        city: String,
+    }
+
+    let user = SensitiveItem::Name("Bob".to_string());
+
+    let redacted = user.redact();
+
+    assert_eq!(SensitiveItem::Name("".to_string()), redacted);
 }
