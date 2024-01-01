@@ -4,7 +4,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{
     parse_macro_input, parse_quote, spanned::Spanned, Data, DataEnum, DataStruct, DeriveInput,
-    Expr, Fields, GenericParam, Generics, Meta,
+    Expr, Fields, GenericParam, Generics, Index, Meta,
 };
 
 #[proc_macro_derive(Redact, attributes(redact))]
@@ -18,7 +18,7 @@ pub fn redact_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
 fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let impls = match input.data {
-        Data::Struct(s) => derive_struct(s)?,
+        Data::Struct(s) => derive_struct(s, false)?,
         Data::Enum(e) => derive_enum(e)?,
         Data::Union(_) => {
             return Err(syn::Error::new(
@@ -59,27 +59,28 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
     generics
 }
 
-fn derive_struct(s: DataStruct) -> Result<TokenStream, syn::Error> {
+fn derive_struct(s: DataStruct, redact_all: bool) -> Result<TokenStream, syn::Error> {
     let span = s.struct_token.span;
+
     let fields_named = match s.fields {
-        Fields::Named(named) => Ok(named),
-        Fields::Unnamed(_) => Err(syn::Error::new(span, "Unnamed fields are not supported")),
+        Fields::Named(named) => Ok(named.named),
+        Fields::Unnamed(unnamed) => Ok(unnamed.unnamed),
         Fields::Unit => Err(syn::Error::new(span, "Unit structs are not supported")),
     }?;
 
     fields_named
-        .named
         .into_iter()
         .enumerate()
         .map(|(i, field)| {
             let span = field.span();
-            let ident = field.ident.unwrap();
-            // @TODO: support unnamed fields
-            //.unwrap_or_else(|| {
-            //    let index = Index::from(i);
-            //    quote! { self.#index }
-            //});
-            //
+            let ident = match field.ident {
+                Some(named) => quote! { #named },
+                None => {
+                    let index = Index::from(i);
+                    quote! { #index }
+                }
+            };
+
             let attrs: Vec<_> = field
                 .attrs
                 .into_iter()
@@ -87,7 +88,10 @@ fn derive_struct(s: DataStruct) -> Result<TokenStream, syn::Error> {
                 .collect();
 
             match attrs.len() {
-                0 => Ok(TokenStream::default()),
+                0 if redact_all => Ok(quote! {
+                    next.#ident = next.#ident.redact();
+                }),
+                0 if !redact_all => Ok(TokenStream::default()),
                 1 => Ok({
                     let attr = &attrs[0];
                     let span = attr.span();
@@ -100,7 +104,6 @@ fn derive_struct(s: DataStruct) -> Result<TokenStream, syn::Error> {
                         });
                     }
 
-                    //let list = attr.meta.require_list()?;
                     attr.parse_nested_meta(|meta| {
                         if meta.path.is_ident("as") {
                             let expr: Expr = meta.value()?.parse()?;

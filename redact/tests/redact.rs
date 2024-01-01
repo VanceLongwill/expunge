@@ -2,9 +2,9 @@ use redact::Redact;
 use sha256::digest;
 
 #[test]
-fn it_works() {
+fn it_works_struct() {
     #[derive(Clone, Redact)]
-    struct User {
+    struct User<G> {
         #[redact]
         pub first_name: String,
         #[redact]
@@ -16,6 +16,8 @@ fn it_works() {
         pub id: u64,
         #[redact]
         pub location: Location,
+        #[redact]
+        pub initial_location: G,
     }
 
     #[derive(Clone, Redact)]
@@ -33,6 +35,9 @@ fn it_works() {
         location: Location {
             city: "New York".to_string(),
         },
+        initial_location: Location {
+            city: "Los Angeles".to_string(),
+        },
     };
 
     let original = user.clone();
@@ -43,6 +48,11 @@ fn it_works() {
     assert_eq!(
         "", redacted.location.city,
         "it should redact nested structs"
+    );
+
+    assert_eq!(
+        "", redacted.initial_location.city,
+        "it should redact generic values"
     );
 
     assert_eq!(
@@ -63,4 +73,30 @@ fn it_works() {
         original.id, redacted.id,
         "fields without the redact attribute should be left as is"
     );
+}
+
+#[test]
+fn it_works_unnamed_struct() {
+    #[derive(Clone, Redact)]
+    struct User(String, #[redact] Location);
+
+    #[derive(Clone, Redact)]
+    struct Location {
+        #[redact]
+        city: String,
+    }
+
+    let user = User(
+        "Bob".to_string(),
+        Location {
+            city: "New York".to_string(),
+        },
+    );
+
+    let original = user.clone();
+
+    let redacted = user.redact();
+
+    assert_eq!("Bob", redacted.0);
+    assert_eq!("", redacted.1.city,);
 }
