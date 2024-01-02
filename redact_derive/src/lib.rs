@@ -18,8 +18,8 @@ pub fn redact_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
 fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let impls = match input.data {
-        Data::Struct(s) => derive_struct(s, false)?,
-        Data::Enum(e) => derive_enum(e, false)?,
+        Data::Struct(s) => derive_struct(s)?,
+        Data::Enum(e) => derive_enum(e)?,
         Data::Union(_) => {
             return Err(syn::Error::new(
                 input.ident.span(),
@@ -84,7 +84,7 @@ impl Builder {
 
 fn parse_attrs(
     span: Span,
-    redact_all: bool,
+    parent: Option<Builder>,
     attrs: Vec<Attribute>,
 ) -> Result<Option<Builder>, syn::Error> {
     let attrs: Vec<_> = attrs
@@ -93,8 +93,7 @@ fn parse_attrs(
         .collect();
 
     match attrs.len() {
-        0 if redact_all => Ok(Some(Builder::default())),
-        0 if !redact_all => Ok(None),
+        0 => Ok(parent),
         1 => {
             let attr = &attrs[0];
             let mut attr_as: Option<TokenStream> = None;
@@ -130,11 +129,23 @@ fn parse_attrs(
     }
 }
 
+//fn derive_builder(
+//    fields: impl IntoIterator<Item = Field>,
+//) -> Result<Vec<Option<Builder>>, syn::Error> {
+//    fields
+//        .into_iter()
+//        .map(|field| {
+//            let span = field.span();
+//            parse_attrs(span, redact_all, field.attrs)
+//        })
+//        .collect()
+//}
+
 fn derive_fields(
     is_enum: bool,
     prefix: TokenStream,
     fields: impl IntoIterator<Item = Field>,
-    redact_all: bool,
+    parent: Option<Builder>,
 ) -> Result<TokenStream, syn::Error> {
     fields
         .into_iter()
@@ -159,7 +170,7 @@ fn derive_fields(
                 }
             };
 
-            match parse_attrs(span, redact_all, field.attrs)? {
+            match parse_attrs(span, parent.clone(), field.attrs)? {
                 Some(builder) => builder.build(span, ident),
                 None => Ok(TokenStream::default()),
             }
@@ -178,8 +189,8 @@ fn get_fields(fields: Fields) -> Result<impl IntoIterator<Item = Field>, syn::Er
     }
 }
 
-fn derive_struct(s: DataStruct, redact_all: bool) -> Result<TokenStream, syn::Error> {
-    let impls = derive_fields(false, quote! { next }, get_fields(s.fields)?, redact_all)?;
+fn derive_struct(s: DataStruct) -> Result<TokenStream, syn::Error> {
+    let impls = derive_fields(false, quote! { next }, get_fields(s.fields)?, None)?;
 
     Ok(quote! {
         let mut next = self;
@@ -190,7 +201,7 @@ fn derive_struct(s: DataStruct, redact_all: bool) -> Result<TokenStream, syn::Er
     })
 }
 
-fn derive_enum(e: DataEnum, redact_all: bool) -> Result<TokenStream, syn::Error> {
+fn derive_enum(e: DataEnum) -> Result<TokenStream, syn::Error> {
     let span = e.enum_token.span();
 
     let variant_idents = e.variants.iter().map(|variant| &variant.ident);
@@ -238,17 +249,15 @@ fn derive_enum(e: DataEnum, redact_all: bool) -> Result<TokenStream, syn::Error>
         .variants
         .iter()
         .map(|variant| {
+            let top_level_builder = parse_attrs(span, None, variant.attrs.clone())?;
+
             let prefix = match &variant.fields {
                 Fields::Named(..) => quote! {},
                 Fields::Unnamed(..) => quote! { arg },
                 Fields::Unit => TokenStream::default(),
             };
-            derive_fields(
-                true,
-                prefix,
-                get_fields(variant.fields.clone())?,
-                redact_all,
-            )
+
+            derive_fields(true, prefix, get_fields(variant.fields.clone())?, None)
         })
         .collect();
 
