@@ -1,11 +1,10 @@
 extern crate proc_macro;
 
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{
-    parse_macro_input, parse_quote, punctuated::Punctuated, spanned::Spanned, Attribute, Data,
-    DataEnum, DataStruct, DeriveInput, Expr, Field, Fields, GenericParam, Generics, Index, Meta,
-    Token,
+    parse_macro_input, parse_quote, spanned::Spanned, Attribute, Data, DataEnum, DataStruct,
+    DeriveInput, Expr, Field, Fields, GenericParam, Generics, Index, Meta,
 };
 
 #[proc_macro_derive(Redact, attributes(redact))]
@@ -63,7 +62,7 @@ struct Builder {
 }
 
 impl Builder {
-    fn redact_struct(self, span: Span, ident: TokenStream) -> Result<TokenStream, syn::Error> {
+    fn build(self, span: Span, ident: TokenStream) -> Result<TokenStream, syn::Error> {
         let Self { attr_as, attr_with } = self;
         match (attr_as, attr_with) {
             (Some(attr_as), None) => Ok(quote_spanned! { span =>
@@ -80,10 +79,6 @@ impl Builder {
                 "unsupported combination of attributes",
             )),
         }
-    }
-
-    fn redact_enum(self, span: Span, ident: TokenStream) -> Result<TokenStream, syn::Error> {
-        Ok(TokenStream::default())
     }
 }
 
@@ -165,12 +160,7 @@ fn derive_fields(
             };
 
             match parse_attrs(span, redact_all, field.attrs)? {
-                Some(builder) => {
-                    //let mut name = prefix.clone();
-                    //name.extend(ident);
-                    //let name = Ident::new(&format!("{prefix}{ident}"), span).into_token_stream();
-                    builder.redact_struct(span, ident)
-                }
+                Some(builder) => builder.build(span, ident),
                 None => Ok(TokenStream::default()),
             }
         })
@@ -248,8 +238,6 @@ fn derive_enum(e: DataEnum, redact_all: bool) -> Result<TokenStream, syn::Error>
         .variants
         .iter()
         .map(|variant| {
-            //let span = variant.span();
-            //let ident = variant.ident.into_token_stream();
             let prefix = match &variant.fields {
                 Fields::Named(..) => quote! {},
                 Fields::Unnamed(..) => quote! { arg },
@@ -261,11 +249,6 @@ fn derive_enum(e: DataEnum, redact_all: bool) -> Result<TokenStream, syn::Error>
                 get_fields(variant.fields.clone())?,
                 redact_all,
             )
-
-            //match parse_attrs(span, redact_all, variant.attrs)? {
-            //    Some(builder) => builder.redact_enum(span, ident),
-            //    None => Ok(TokenStream::default()),
-            //}
         })
         .collect();
 

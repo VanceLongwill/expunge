@@ -102,6 +102,11 @@ fn it_works_unnamed_struct() {
 #[test]
 fn it_works_enum() {
     #[derive(PartialEq, Debug, Clone, Redact)]
+    enum SensitiveNested {
+        Name(#[redact] String, i32),
+    }
+
+    #[derive(PartialEq, Debug, Clone, Redact)]
     enum SensitiveItem {
         Name(#[redact] String, i32),
         DateOfBirth(String),
@@ -110,6 +115,7 @@ fn it_works_enum() {
             account_number: i32,
         },
         Location(#[redact] Location),
+        Nested(#[redact] SensitiveNested),
     }
 
     #[derive(PartialEq, Debug, Clone, Redact, Default)]
@@ -136,4 +142,11 @@ fn it_works_enum() {
 
     let redacted = item.redact();
     assert_eq!(SensitiveItem::Location(Location::default()), redacted);
+
+    let item = SensitiveItem::Nested(SensitiveNested::Name("Alice".to_string(), 1));
+    let redacted = item.redact();
+    assert_eq!(
+        SensitiveItem::Nested(SensitiveNested::Name("".to_string(), 1)),
+        redacted
+    );
 }

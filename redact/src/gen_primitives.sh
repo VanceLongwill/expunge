@@ -2,6 +2,8 @@
 
 # Usage: ./gen_primitives.sh > primitives.rs
 
+# Doing this to avoid typing and more macros. There's almost certainly a better way.
+
 types=(
 "i8" "i16" "i32" "i64" "i128" "isize"
 "u8" "u16" "u32" "u64" "u128" "usize"
