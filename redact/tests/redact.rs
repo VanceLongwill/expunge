@@ -103,20 +103,37 @@ fn it_works_unnamed_struct() {
 fn it_works_enum() {
     #[derive(PartialEq, Debug, Clone, Redact)]
     enum SensitiveItem {
-        #[redact]
-        Name(String),
+        Name(#[redact] String, i32),
         DateOfBirth(String),
+        BankDetails {
+            #[redact]
+            account_number: i32,
+        },
+        Location(#[redact] Location),
     }
 
-    #[derive(Clone, Redact)]
+    #[derive(PartialEq, Debug, Clone, Redact, Default)]
     struct Location {
         #[redact]
         city: String,
     }
 
-    let user = SensitiveItem::Name("Bob".to_string());
+    let item = SensitiveItem::Name("Bob".to_string(), 1);
 
-    let redacted = user.redact();
+    let redacted = item.redact();
 
-    assert_eq!(SensitiveItem::Name("".to_string()), redacted);
+    assert_eq!(SensitiveItem::Name("".to_string(), 1), redacted);
+
+    let item = SensitiveItem::BankDetails {
+        account_number: 123,
+    };
+    let redacted = item.redact();
+    assert_eq!(SensitiveItem::BankDetails { account_number: 0 }, redacted);
+
+    let item = SensitiveItem::Location(Location {
+        city: "New York".to_string(),
+    });
+
+    let redacted = item.redact();
+    assert_eq!(SensitiveItem::Location(Location::default()), redacted);
 }

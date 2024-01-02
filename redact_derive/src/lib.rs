@@ -1,10 +1,11 @@
 extern crate proc_macro;
 
-use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::{quote, quote_spanned, ToTokens, TokenStreamExt};
 use syn::{
-    parse_macro_input, parse_quote, spanned::Spanned, Attribute, Data, DataEnum, DataStruct,
-    DeriveInput, Expr, Fields, GenericParam, Generics, Index, Meta,
+    parse_macro_input, parse_quote, punctuated::Punctuated, spanned::Spanned, Attribute, Data,
+    DataEnum, DataStruct, DeriveInput, Expr, Field, Fields, GenericParam, Generics, Index, Meta,
+    Token,
 };
 
 #[proc_macro_derive(Redact, attributes(redact))]
@@ -37,11 +38,7 @@ fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
             fn redact(self) -> Self {
                 use ::redact::*;
 
-                let mut next = self;
-
                 #impls
-
-                next
             }
         }
     };
@@ -59,32 +56,57 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
     generics
 }
 
+#[derive(Debug, Clone, Default)]
+struct Builder {
+    attr_as: Option<TokenStream>,
+    attr_with: Option<TokenStream>,
+}
+
+impl Builder {
+    fn redact_struct(self, span: Span, ident: TokenStream) -> Result<TokenStream, syn::Error> {
+        let Self { attr_as, attr_with } = self;
+        match (attr_as, attr_with) {
+            (Some(attr_as), None) => Ok(quote_spanned! { span =>
+                #ident = #attr_as;
+            }),
+            (None, Some(attr_with)) => Ok(quote_spanned! { span =>
+                #ident = #attr_with(#ident);
+            }),
+            (None, None) => Ok(quote_spanned! { span =>
+                #ident = #ident.redact();
+            }),
+            _ => Err(syn::Error::new(
+                span,
+                "unsupported combination of attributes",
+            )),
+        }
+    }
+
+    fn redact_enum(self, span: Span, ident: TokenStream) -> Result<TokenStream, syn::Error> {
+        Ok(TokenStream::default())
+    }
+}
+
 fn parse_attrs(
     span: Span,
     redact_all: bool,
-    ident: TokenStream,
     attrs: Vec<Attribute>,
-) -> Result<TokenStream, syn::Error> {
+) -> Result<Option<Builder>, syn::Error> {
     let attrs: Vec<_> = attrs
         .into_iter()
         .filter(|attr| attr.path().is_ident("redact"))
         .collect();
 
     match attrs.len() {
-        0 if redact_all => Ok(quote! {
-            next.#ident = next.#ident.redact();
-        }),
-        0 if !redact_all => Ok(TokenStream::default()),
-        1 => Ok({
+        0 if redact_all => Ok(Some(Builder::default())),
+        0 if !redact_all => Ok(None),
+        1 => {
             let attr = &attrs[0];
-            let span = attr.span();
             let mut attr_as: Option<TokenStream> = None;
             let mut attr_with: Option<TokenStream> = None;
 
             if matches!(attr.meta, Meta::Path(..)) {
-                return Ok(quote! {
-                    next.#ident = next.#ident.redact();
-                });
+                return Ok(Some(Builder::default()));
             }
 
             attr.parse_nested_meta(|meta| {
@@ -104,22 +126,8 @@ fn parse_attrs(
                 }
             })?;
 
-            match (attr_as, attr_with) {
-                (Some(attr_as), None) => Ok(quote_spanned! { span =>
-                    next.#ident = #attr_as;
-                }),
-                (None, Some(attr_with)) => Ok(quote_spanned! { span =>
-                    next.#ident = #attr_with(next.#ident);
-                }),
-                (None, None) => Ok(quote_spanned! { span =>
-                    next.#ident = next.#ident.redact();
-                }),
-                _ => Err(syn::Error::new(
-                    span,
-                    "unsupported combination of attributes",
-                )),
-            }?
-        }),
+            Ok(Some(Builder { attr_as, attr_with }))
+        }
         n => Err(syn::Error::new(
             span,
             format!("expected 1 or 0 `redact` tags, found {n}"),
@@ -127,43 +135,148 @@ fn parse_attrs(
     }
 }
 
-fn derive_struct(s: DataStruct, redact_all: bool) -> Result<TokenStream, syn::Error> {
-    let fields_named = match s.fields {
+fn derive_fields(
+    is_enum: bool,
+    prefix: TokenStream,
+    fields: impl IntoIterator<Item = Field>,
+    redact_all: bool,
+) -> Result<TokenStream, syn::Error> {
+    fields
+        .into_iter()
+        .enumerate()
+        .map(|(i, field)| {
+            let span = field.span();
+            let ident = match field.ident {
+                Some(named) => {
+                    if is_enum {
+                        named.into_token_stream()
+                    } else {
+                        quote! { #prefix.#named }
+                    }
+                }
+                None => {
+                    if is_enum {
+                        Ident::new(&format!("{prefix}{i}"), span).into_token_stream()
+                    } else {
+                        let index = Index::from(i);
+                        quote! { #prefix.#index }
+                    }
+                }
+            };
+
+            match parse_attrs(span, redact_all, field.attrs)? {
+                Some(builder) => {
+                    //let mut name = prefix.clone();
+                    //name.extend(ident);
+                    //let name = Ident::new(&format!("{prefix}{ident}"), span).into_token_stream();
+                    builder.redact_struct(span, ident)
+                }
+                None => Ok(TokenStream::default()),
+            }
+        })
+        .collect()
+}
+
+fn get_fields(fields: Fields) -> Result<impl IntoIterator<Item = Field>, syn::Error> {
+    match fields {
         Fields::Named(named) => Ok(named.named),
         Fields::Unnamed(unnamed) => Ok(unnamed.unnamed),
         unit @ Fields::Unit => Err(syn::Error::new(
             unit.span(),
             "Unit structs are not supported",
         )),
-    }?;
+    }
+}
 
-    fields_named
-        .into_iter()
-        .enumerate()
-        .map(|(i, field)| {
-            let span = field.span();
-            let ident = match field.ident {
-                Some(named) => quote! { #named },
-                None => {
-                    let index = Index::from(i);
-                    quote! { #index }
-                }
-            };
-            parse_attrs(span, redact_all, ident, field.attrs)
-        })
-        .collect()
+fn derive_struct(s: DataStruct, redact_all: bool) -> Result<TokenStream, syn::Error> {
+    let impls = derive_fields(false, quote! { next }, get_fields(s.fields)?, redact_all)?;
+
+    Ok(quote! {
+        let mut next = self;
+
+        #impls
+
+        next
+    })
 }
 
 fn derive_enum(e: DataEnum, redact_all: bool) -> Result<TokenStream, syn::Error> {
     let span = e.enum_token.span();
 
-    e.variants
-        .into_iter()
-        .map(|variant| {
-            let span = variant.span();
-            let ident = variant.ident.into_token_stream();
+    let variant_idents = e.variants.iter().map(|variant| &variant.ident);
 
-            parse_attrs(span, redact_all, ident, variant.attrs)
+    let variant_destructures = e.variants.iter().map(|variant| match &variant.fields {
+        syn::Fields::Named(syn::FieldsNamed { named, .. }) => {
+            let idents = named.iter().map(|field| field.ident.as_ref().unwrap());
+            quote! {
+                { #(#idents),* }
+            }
+        }
+        syn::Fields::Unnamed(syn::FieldsUnnamed { unnamed, .. }) => {
+            let args = (0..unnamed.len())
+                .map(|i| syn::Ident::new(&format!("arg{i}"), unnamed.span()))
+                .map(|ident| quote! { #ident });
+            quote! {
+                ( #(#args),* )
+            }
+        }
+        syn::Fields::Unit => Default::default(),
+    });
+
+    let variant_destructures_mut = e.variants.iter().map(|variant| match &variant.fields {
+        syn::Fields::Named(syn::FieldsNamed { named, .. }) => {
+            let idents = named
+                .iter()
+                .map(|field| field.ident.as_ref().unwrap())
+                .map(|ident| quote! { mut #ident });
+            quote! {
+                { #(#idents),* }
+            }
+        }
+        syn::Fields::Unnamed(syn::FieldsUnnamed { unnamed, .. }) => {
+            let args = (0..unnamed.len())
+                .map(|i| syn::Ident::new(&format!("arg{i}"), unnamed.span()))
+                .map(|ident| quote! { mut #ident });
+            quote! {
+                ( #(#args),* )
+            }
+        }
+        syn::Fields::Unit => Default::default(),
+    });
+
+    let variant_bodies: Result<Vec<TokenStream>, syn::Error> = e
+        .variants
+        .iter()
+        .map(|variant| {
+            //let span = variant.span();
+            //let ident = variant.ident.into_token_stream();
+            let prefix = match &variant.fields {
+                Fields::Named(..) => quote! {},
+                Fields::Unnamed(..) => quote! { arg },
+                Fields::Unit => TokenStream::default(),
+            };
+            derive_fields(
+                true,
+                prefix,
+                get_fields(variant.fields.clone())?,
+                redact_all,
+            )
+
+            //match parse_attrs(span, redact_all, variant.attrs)? {
+            //    Some(builder) => builder.redact_enum(span, ident),
+            //    None => Ok(TokenStream::default()),
+            //}
         })
-        .collect()
+        .collect();
+
+    let bodies = variant_bodies?.into_iter();
+
+    Ok(quote_spanned! { span =>
+        match self {
+                    #(Self::#variant_idents #variant_destructures_mut => {
+                        #bodies
+                        Self::#variant_idents #variant_destructures
+                    },)*
+        }
+    })
 }
