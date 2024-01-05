@@ -192,7 +192,6 @@ fn derive_fields(
         .enumerate()
         .map(|(i, field)| {
             let span = field.span();
-            let parent_attrs = parent.clone();
             let builder = parse_attributes(span, Some(parent.clone()), field.attrs)?
                 .map(|f| {
                     let Builder {
@@ -204,16 +203,13 @@ fn derive_fields(
                     let (redact_as, redact_with) = match (redact_as, redact_with) {
                         (Some(ra), None) => (Some(ra), None),
                         (None, Some(rw)) => (None, Some(rw)),
-                        (None, None) => (
-                            parent_attrs.redact_as.clone(),
-                            parent_attrs.redact_with.clone(),
-                        ),
+                        (None, None) => (parent.redact_as.clone(), parent.redact_with.clone()),
                         (Some(_), Some(_)) => {
                             return Err(syn::Error::new(span, "`as` and `with` cannot be combined"))
                         }
                     };
-                    let ignore = ignore || parent_attrs.ignore;
-                    let all = all || parent_attrs.all;
+                    let ignore = ignore || parent.ignore;
+                    let all = all || parent.all;
                     Ok(Builder {
                         redact_as,
                         redact_with,
@@ -223,8 +219,8 @@ fn derive_fields(
                 })
                 .transpose()?;
 
-            let builder = if parent_attrs.all {
-                builder.or(Some(parent_attrs.clone()))
+            let builder = if parent.all {
+                builder.or(Some(parent.clone()))
             } else {
                 builder
             };
@@ -257,19 +253,18 @@ fn derive_fields(
         .collect()
 }
 
-fn get_fields(fields: Fields) -> Result<impl IntoIterator<Item = Field>, syn::Error> {
+fn get_fields(fields: Fields) -> Option<impl IntoIterator<Item = Field>> {
     match fields {
-        Fields::Named(named) => Ok(named.named),
-        Fields::Unnamed(unnamed) => Ok(unnamed.unnamed),
-        unit @ Fields::Unit => Err(syn::Error::new(
-            unit.span(),
-            "Unit structs are not supported",
-        )),
+        Fields::Named(named) => Some(named.named),
+        Fields::Unnamed(unnamed) => Some(unnamed.unnamed),
+        Fields::Unit => None,
     }
 }
 
 fn derive_struct(s: DataStruct, parent: Builder) -> Result<TokenStream, syn::Error> {
-    let impls = derive_fields(false, quote! { next }, get_fields(s.fields)?, parent)?;
+    let impls = get_fields(s.fields)
+        .map(|fields| derive_fields(false, quote! { next }, fields, parent))
+        .transpose()?;
 
     Ok(quote! {
         let mut next = self;
@@ -336,13 +331,16 @@ fn derive_enum(e: DataEnum, parent: Builder) -> Result<TokenStream, syn::Error> 
                 })
                 .unwrap_or(parent.clone());
 
-            let prefix = match &variant.fields {
-                Fields::Named(..) => quote! {},
-                Fields::Unnamed(..) => quote! { arg },
-                Fields::Unit => TokenStream::default(),
+            let prefix = if let Fields::Unnamed(..) = &variant.fields {
+                quote! { arg }
+            } else {
+                TokenStream::default()
             };
 
-            derive_fields(true, prefix, get_fields(variant.fields.clone())?, parent)
+            get_fields(variant.fields.clone())
+                .map(|fields| derive_fields(true, prefix, fields, parent))
+                .transpose()
+                .map(Option::unwrap_or_default)
         })
         .collect();
 

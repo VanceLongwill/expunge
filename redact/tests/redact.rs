@@ -18,6 +18,21 @@ fn it_works_struct() {
         pub location: Location,
         #[redact]
         pub initial_location: G,
+        #[allow(dead_code)]
+        #[redact(ignore)]
+        pub some_unit: UnitStruct,
+    }
+
+    #[derive(Clone)]
+    struct UnitStruct;
+
+    impl Redact for UnitStruct {
+        fn redact(self) -> Self
+        where
+            Self: Sized,
+        {
+            self
+        }
     }
 
     #[derive(Clone, Redact)]
@@ -38,6 +53,7 @@ fn it_works_struct() {
         initial_location: Location {
             city: "Los Angeles".to_string(),
         },
+        some_unit: UnitStruct,
     };
 
     let original = user.clone();
@@ -178,6 +194,18 @@ fn it_works_enum() {
         Name(#[redact] String, i32),
     }
 
+    #[derive(Clone, Debug, PartialEq)]
+    struct UnitStruct;
+
+    impl Redact for UnitStruct {
+        fn redact(self) -> Self
+        where
+            Self: Sized,
+        {
+            self
+        }
+    }
+
     #[derive(PartialEq, Debug, Clone, Redact)]
     enum SensitiveItem {
         Name(#[redact] String, i32),
@@ -191,6 +219,8 @@ fn it_works_enum() {
         Nested(SensitiveNested, i32),
         #[redact]
         LocationHistory(Vec<Location>),
+        #[redact]
+        WithUnit(i32, UnitStruct),
     }
 
     #[derive(PartialEq, Debug, Clone, Redact, Default)]

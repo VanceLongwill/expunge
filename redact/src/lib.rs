@@ -72,6 +72,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 impl<T> Redacted<T> {
     fn into_inner(self) -> T {
         self.0
