@@ -18,7 +18,7 @@ pub fn redact_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
 fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let span = input.span();
-    let builder = parse_attrs(span, None, input.attrs)?;
+    let builder = parse_attributes(span, None, input.attrs)?.unwrap_or_default();
     let impls = match input.data {
         Data::Struct(s) => derive_struct(s, builder)?,
         Data::Enum(e) => derive_enum(e, builder)?,
@@ -59,27 +59,29 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
 
 #[derive(Debug, Clone, Default)]
 struct Builder {
-    attr_as: Option<TokenStream>,
-    attr_with: Option<TokenStream>,
+    redact_as: Option<TokenStream>,
+    redact_with: Option<TokenStream>,
     ignore: bool,
+    all: bool,
 }
 
 impl Builder {
     fn build(self, span: Span, ident: TokenStream) -> Result<TokenStream, syn::Error> {
         let Self {
-            attr_as,
-            attr_with,
+            redact_as,
+            redact_with,
             ignore,
+            all: _,
         } = self;
         if ignore {
             return Ok(TokenStream::default());
         }
-        match (attr_as, attr_with) {
-            (Some(attr_as), None) => Ok(quote_spanned! { span =>
-                #ident = #attr_as;
+        match (redact_as, redact_with) {
+            (Some(redact_as), None) => Ok(quote_spanned! { span =>
+                #ident = #redact_as;
             }),
-            (None, Some(attr_with)) => Ok(quote_spanned! { span =>
-                #ident = #attr_with(#ident);
+            (None, Some(redact_with)) => Ok(quote_spanned! { span =>
+                #ident = #redact_with(#ident);
             }),
             (None, None) => Ok(quote_spanned! { span =>
                 #ident = #ident.redact();
@@ -92,7 +94,7 @@ impl Builder {
     }
 }
 
-fn parse_attrs(
+fn parse_attributes(
     span: Span,
     parent: Option<Builder>,
     attrs: Vec<Attribute>,
@@ -102,27 +104,65 @@ fn parse_attrs(
         .filter(|attr| attr.path().is_ident("redact"))
         .collect();
 
+    let is_container = parent.is_none();
+
     match attrs.len() {
-        0 => Ok(parent),
+        0 => Ok(parent.and_then(|p| if p.all { Some(p) } else { None })),
         1 => {
             let attr = &attrs[0];
-            let mut builder = Builder::default();
 
             if matches!(attr.meta, Meta::Path(..)) {
-                return Ok(Some(builder));
+                return parent
+                    .ok_or(syn::Error::new(
+                        attr.meta.span(),
+                        "`#[redact]` can only be used to mark fields & variants".to_string(),
+                    ))
+                    .map(Some);
             }
+
+            let mut builder = Builder::default();
 
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident("as") {
+                    if builder.redact_with.is_some() {
+                        return Err(syn::Error::new(
+                            meta.path.span(),
+                            format!("`{:?}` cannot be combined with `with`", meta.path),
+                        ));
+                    }
                     let expr: Expr = meta.value()?.parse()?;
-                    builder.attr_as = Some(expr.into_token_stream());
+                    builder.redact_as = Some(expr.into_token_stream());
                     Ok(())
                 } else if meta.path.is_ident("with") {
+                    if builder.redact_as.is_some() {
+                        return Err(syn::Error::new(
+                            meta.path.span(),
+                            format!("`{:?}` cannot be combined with `as`", meta.path),
+                        ));
+                    }
                     let expr: Expr = meta.value()?.parse()?;
-                    builder.attr_with = Some(expr.into_token_stream());
+                    builder.redact_with = Some(expr.into_token_stream());
                     Ok(())
                 } else if meta.path.is_ident("ignore") {
+                    if is_container {
+                        return Err(syn::Error::new(
+                            meta.path.span(),
+                            format!("`{:?}` is not permitted on containers", meta.path),
+                        ));
+                    }
                     builder.ignore = true;
+                    Ok(())
+                } else if meta.path.is_ident("all") {
+                    if !is_container {
+                        return Err(syn::Error::new(
+                            meta.path.span(),
+                            format!(
+                                "`{:?}` is not permitted on fields and variant, use #[redact] instead",
+                                meta.path
+                            ),
+                        ));
+                    }
+                    builder.all = true;
                     Ok(())
                 } else {
                     Err(syn::Error::new(
@@ -141,55 +181,78 @@ fn parse_attrs(
     }
 }
 
-fn derive_builder(
-    fields: impl IntoIterator<Item = Field>,
-    parent: Option<Builder>,
-) -> Result<Vec<Option<Builder>>, syn::Error> {
-    fields
-        .into_iter()
-        .map(|field| {
-            let span = field.span();
-            parse_attrs(span, parent.clone(), field.attrs)
-        })
-        .collect()
-}
-
 fn derive_fields(
     is_enum: bool,
     prefix: TokenStream,
     fields: impl IntoIterator<Item = Field>,
-    parent: Option<Builder>,
+    parent: Builder,
 ) -> Result<TokenStream, syn::Error> {
     fields
         .into_iter()
         .enumerate()
         .map(|(i, field)| {
             let span = field.span();
-            let ident = match field.ident {
-                Some(named) => {
-                    if is_enum {
-                        named.into_token_stream()
-                    } else {
-                        quote! { #prefix.#named }
-                    }
-                }
-                None => {
-                    if is_enum {
-                        Ident::new(&format!("{prefix}{i}"), span).into_token_stream()
-                    } else {
-                        let index = Index::from(i);
-                        quote! { #prefix.#index }
-                    }
-                }
+            let parent_attrs = parent.clone();
+            let builder = parse_attributes(span, Some(parent.clone()), field.attrs)?
+                .map(|f| {
+                    let Builder {
+                        redact_as,
+                        redact_with,
+                        ignore,
+                        all,
+                    } = f;
+                    let (redact_as, redact_with) = match (redact_as, redact_with) {
+                        (Some(ra), None) => (Some(ra), None),
+                        (None, Some(rw)) => (None, Some(rw)),
+                        (None, None) => (
+                            parent_attrs.redact_as.clone(),
+                            parent_attrs.redact_with.clone(),
+                        ),
+                        (Some(_), Some(_)) => {
+                            return Err(syn::Error::new(span, "`as` and `with` cannot be combined"))
+                        }
+                    };
+                    let ignore = ignore || parent_attrs.ignore;
+                    let all = all || parent_attrs.all;
+                    Ok(Builder {
+                        redact_as,
+                        redact_with,
+                        ignore,
+                        all,
+                    })
+                })
+                .transpose()?;
+
+            let builder = if parent_attrs.all {
+                builder.or(Some(parent_attrs.clone()))
+            } else {
+                builder
             };
 
-            match (
-                parse_attrs(span, parent.clone(), field.attrs)?,
-                parent.clone(),
-            ) {
-                (Some(builder), _) | (None, Some(builder)) => builder.build(span, ident),
-                (None, None) => Ok(TokenStream::default()),
-            }
+            Ok(builder
+                .map(|builder| {
+                    let ident = match field.ident {
+                        Some(named) => {
+                            if is_enum {
+                                named.into_token_stream()
+                            } else {
+                                quote! { #prefix.#named }
+                            }
+                        }
+                        None => {
+                            if is_enum {
+                                Ident::new(&format!("{prefix}{i}"), span).into_token_stream()
+                            } else {
+                                let index = Index::from(i);
+                                quote! { #prefix.#index }
+                            }
+                        }
+                    };
+
+                    builder.build(span, ident)
+                })
+                .transpose()?
+                .unwrap_or(TokenStream::default()))
         })
         .collect()
 }
@@ -205,7 +268,7 @@ fn get_fields(fields: Fields) -> Result<impl IntoIterator<Item = Field>, syn::Er
     }
 }
 
-fn derive_struct(s: DataStruct, parent: Option<Builder>) -> Result<TokenStream, syn::Error> {
+fn derive_struct(s: DataStruct, parent: Builder) -> Result<TokenStream, syn::Error> {
     let impls = derive_fields(false, quote! { next }, get_fields(s.fields)?, parent)?;
 
     Ok(quote! {
@@ -217,7 +280,7 @@ fn derive_struct(s: DataStruct, parent: Option<Builder>) -> Result<TokenStream, 
     })
 }
 
-fn derive_enum(e: DataEnum, parent: Option<Builder>) -> Result<TokenStream, syn::Error> {
+fn derive_enum(e: DataEnum, parent: Builder) -> Result<TokenStream, syn::Error> {
     let span = e.enum_token.span();
 
     let variant_idents = e.variants.iter().map(|variant| &variant.ident);
@@ -265,7 +328,13 @@ fn derive_enum(e: DataEnum, parent: Option<Builder>) -> Result<TokenStream, syn:
         .variants
         .iter()
         .map(|variant| {
-            let parent = parse_attrs(span, None, variant.attrs.clone())?.or(parent.clone());
+            let parent = parse_attributes(span, Some(parent.clone()), variant.attrs.clone())?
+                .map(|mut p| {
+                    // the `#[redact]` tag on an enum variant is equivalent to `#[redact(all)]`
+                    p.all = true;
+                    p
+                })
+                .unwrap_or(parent.clone());
 
             let prefix = match &variant.fields {
                 Fields::Named(..) => quote! {},

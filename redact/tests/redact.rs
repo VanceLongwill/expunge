@@ -102,7 +102,7 @@ fn it_works_unnamed_struct() {
 #[test]
 fn it_works_struct_all() {
     #[derive(Clone, Redact)]
-    #[redact]
+    #[redact(all)]
     struct User<G> {
         pub first_name: String,
         pub middle_name: Option<String>,
@@ -188,7 +188,9 @@ fn it_works_enum() {
         },
         Location(#[redact] Location),
         #[redact]
-        Nested(SensitiveNested),
+        Nested(SensitiveNested, i32),
+        #[redact]
+        LocationHistory(Vec<Location>),
     }
 
     #[derive(PartialEq, Debug, Clone, Redact, Default)]
@@ -209,17 +211,28 @@ fn it_works_enum() {
     let redacted = item.redact();
     assert_eq!(SensitiveItem::BankDetails { account_number: 0 }, redacted);
 
-    let item = SensitiveItem::Location(Location {
+    let new_york = Location {
         city: "New York".to_string(),
-    });
+    };
+    let item = SensitiveItem::Location(new_york.clone());
 
     let redacted = item.redact();
     assert_eq!(SensitiveItem::Location(Location::default()), redacted);
 
-    let item = SensitiveItem::Nested(SensitiveNested::Name("Alice".to_string(), 1));
+    let item = SensitiveItem::Nested(SensitiveNested::Name("Alice".to_string(), 1), 99);
     let redacted = item.redact();
     assert_eq!(
-        SensitiveItem::Nested(SensitiveNested::Name("".to_string(), 1)),
+        SensitiveItem::Nested(SensitiveNested::Name("".to_string(), 1), 0),
+        redacted
+    );
+
+    let boston = Location {
+        city: "Boston".to_string(),
+    };
+    let item = SensitiveItem::LocationHistory(vec![new_york, boston]);
+    let redacted = item.redact();
+    assert_eq!(
+        SensitiveItem::LocationHistory(vec![Location::default(), Location::default()],),
         redacted
     );
 }
