@@ -1,5 +1,4 @@
 use redact::Redact;
-use sha256::digest;
 
 #[test]
 fn it_works_struct() {
@@ -11,7 +10,7 @@ fn it_works_struct() {
         pub middle_name: Option<String>,
         #[redact(as = "anon.".to_string())]
         pub last_name: String,
-        #[redact(with = digest)]
+        #[redact(with = sha256::digest)]
         pub address: String,
         pub id: u64,
         #[redact]
@@ -124,7 +123,7 @@ fn it_works_struct_all() {
         pub middle_name: Option<String>,
         #[redact(as = "anon.".to_string())]
         pub last_name: String,
-        #[redact(with = digest)]
+        #[redact(with = sha256::digest)]
         pub address: String,
         #[redact(ignore)]
         pub id: u64,
@@ -221,6 +220,17 @@ fn it_works_enum() {
         LocationHistory(Vec<Location>),
         #[redact]
         WithUnit(i32, UnitStruct),
+        #[redact(as = Default::default())]
+        DoesntImplementRedact(Unredactable),
+        #[redact(zeroize)]
+        Zeroizable(i32),
+        #[redact(zeroize, as = 99)]
+        ZeroizableAs(i32),
+    }
+
+    #[derive(PartialEq, Debug, Clone, Default)]
+    struct Unredactable {
+        name: String,
     }
 
     #[derive(PartialEq, Debug, Clone, Redact, Default)]

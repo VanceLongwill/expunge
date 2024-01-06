@@ -6,7 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-redact_derive = { path = "../redact_derive"}
+redact_derive = { path = "../redact_derive" }
+zeroize = { version = "1.7.0", optional = true }
+serde = { version = "1.0", optional = true }
 
 [dev-dependencies]
+redact_derive = { path = "../redact_derive", features = ["all"] }
 sha256 = "1.4.0"
+
+[features]
+default = []
+all = ["zeroize"]
+zeroize = ["dep:zeroize"]
+serde = ["dep:serde"]

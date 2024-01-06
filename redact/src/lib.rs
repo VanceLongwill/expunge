@@ -1,9 +1,17 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 pub use redact_derive::*;
 
 pub mod primitives;
 pub use primitives::*;
+
+#[cfg(feature = "zeroize")]
+#[doc(hidden)]
+pub use ::zeroize;
+
+#[cfg(feature = "serde")]
+#[doc(hidden)]
+pub use ::serde;
 
 pub trait Redact {
     fn redact(self) -> Self
@@ -87,6 +95,12 @@ impl<T> Deref for Redacted<T> {
     }
 }
 
+impl<T> DerefMut for Redacted<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl<T> std::fmt::Display for Redacted<T>
 where
     T: std::fmt::Display,
@@ -116,8 +130,3 @@ where
         self.into_iter().map(Redact::redact).collect()
     }
 }
-
-// @TODO: Serialize and Deserialize behind feature flag serde
-//
-//impl<T> Serialize for Redacted<T> where T: Serialize {
-//}

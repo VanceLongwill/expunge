@@ -63,6 +63,7 @@ struct Builder {
     redact_with: Option<TokenStream>,
     ignore: bool,
     all: bool,
+    zeroize: bool,
 }
 
 impl Builder {
@@ -72,18 +73,33 @@ impl Builder {
             redact_with,
             ignore,
             all: _,
+            zeroize,
         } = self;
         if ignore {
             return Ok(TokenStream::default());
         }
+
+        let zeroizer = if zeroize {
+            quote! {
+                use ::redact::zeroize::Zeroize;
+                let mut ident = #ident;
+                (&mut #ident).zeroize(); 
+            }
+        } else {
+            TokenStream::default()
+        };
+
         match (redact_as, redact_with) {
             (Some(redact_as), None) => Ok(quote_spanned! { span =>
+                #zeroizer
                 #ident = #redact_as;
             }),
             (None, Some(redact_with)) => Ok(quote_spanned! { span =>
+                #zeroizer
                 #ident = #redact_with(#ident);
             }),
             (None, None) => Ok(quote_spanned! { span =>
+                #zeroizer
                 #ident = #ident.redact();
             }),
             _ => Err(syn::Error::new(
@@ -93,6 +109,12 @@ impl Builder {
         }
     }
 }
+
+const WITH: &str = "with";
+const AS: &str = "as";
+const ALL: &str = "all";
+const IGNORE: &str = "ignore";
+const ZEROIZE: &str = "zeroize";
 
 fn parse_attributes(
     span: Span,
@@ -123,7 +145,7 @@ fn parse_attributes(
             let mut builder = Builder::default();
 
             attr.parse_nested_meta(|meta| {
-                if meta.path.is_ident("as") {
+                if meta.path.is_ident(AS) {
                     if builder.redact_with.is_some() {
                         return Err(syn::Error::new(
                             meta.path.span(),
@@ -133,7 +155,7 @@ fn parse_attributes(
                     let expr: Expr = meta.value()?.parse()?;
                     builder.redact_as = Some(expr.into_token_stream());
                     Ok(())
-                } else if meta.path.is_ident("with") {
+                } else if meta.path.is_ident(WITH) {
                     if builder.redact_as.is_some() {
                         return Err(syn::Error::new(
                             meta.path.span(),
@@ -143,7 +165,7 @@ fn parse_attributes(
                     let expr: Expr = meta.value()?.parse()?;
                     builder.redact_with = Some(expr.into_token_stream());
                     Ok(())
-                } else if meta.path.is_ident("ignore") {
+                } else if meta.path.is_ident(IGNORE) {
                     if is_container {
                         return Err(syn::Error::new(
                             meta.path.span(),
@@ -152,7 +174,7 @@ fn parse_attributes(
                     }
                     builder.ignore = true;
                     Ok(())
-                } else if meta.path.is_ident("all") {
+                } else if meta.path.is_ident(ALL) {
                     if !is_container {
                         return Err(syn::Error::new(
                             meta.path.span(),
@@ -164,7 +186,18 @@ fn parse_attributes(
                     }
                     builder.all = true;
                     Ok(())
-                } else {
+                } else if meta.path.is_ident(ZEROIZE) {
+                    if cfg!(feature = "zeroize") {
+                        builder.zeroize = true;
+                        Ok(())
+                    } else {
+                        Err(syn::Error::new(
+                            meta.path.span(),
+                            "the `zeroize` feature must be enabled",
+                        ))
+                    }
+                } 
+                else {
                     Err(syn::Error::new(
                         meta.path.span(),
                         format!("unrecognized option `{:?}`", meta.path),
@@ -199,6 +232,7 @@ fn derive_fields(
                         redact_with,
                         ignore,
                         all,
+                        zeroize,
                     } = f;
                     let (redact_as, redact_with) = match (redact_as, redact_with) {
                         (Some(ra), None) => (Some(ra), None),
@@ -210,11 +244,13 @@ fn derive_fields(
                     };
                     let ignore = ignore || parent.ignore;
                     let all = all || parent.all;
+                    let zeroize = zeroize || parent.zeroize;
                     Ok(Builder {
                         redact_as,
                         redact_with,
                         ignore,
                         all,
+                        zeroize,
                     })
                 })
                 .transpose()?;
