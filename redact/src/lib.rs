@@ -1,3 +1,75 @@
+//! Redact provides a straightfoward macro-based approach for dealing with
+//! sensitive values.
+//!
+//! Keeping track of which values are sensitive (e.g. PII, secrets) is as simple as
+//! marking them with the `#[redact]` attribute. Then, when you need a sanitized copy of your data,
+//! simply do `let sanitized = data.redact();`. If no other redact behaviour is specified (see `as`
+//! & `with`), the field will be replaced with its default value.
+//!
+//! ### Usage
+//!
+//! ```rust
+//! use redact::Redact;
+//! use serde::{Serialize, Deserialize};
+//!
+//! #[derive(Clone, Debug, Serialize, Deserialize, Redact)]
+//! struct User {
+//!   id: i64, // fields without #[redact] annotations are left as is
+//!   #[redact(as = "Randy".to_string())]
+//!   first_name: String,
+//!   #[redact(as = "Lahey".to_string())]
+//!   last_name: String,
+//!   #[redact(with = sha256::digest)]
+//!   date_of_birth: String,
+//!   #[redact]
+//!   latitude: f64,
+//!   #[redact]
+//!   longitude: f64,
+//!   #[redact(as = "<redacted>".to_string(), zeroize)]
+//!   password_hash: String,
+//! }
+//!
+//! let user = User{
+//!     id: 101,
+//!     first_name: "Ricky".to_string(),
+//!     last_name: "LaFleur".to_string(),
+//!     date_of_birth: "02/02/1960".to_string(),
+//!     latitude: 45.0778,
+//!     longitude: 63.546,
+//!     password_hash: "2f089e52def4cec8b911883fecdd6d8febe9c9f362d15e3e33feb2c12f07ccc1".to_string(),
+//! };
+//!
+//! let redacted_user = user.redact();
+//!
+//! let output = serde_json::to_string_pretty(&redacted_user).expect("should serialize");
+//!
+//! assert_eq!(
+//!   r#"{
+//!   "id": 101,
+//!   "first_name": "Randy",
+//!   "last_name": "Lahey",
+//!   "date_of_birth": "eeb98c815ae11240b563892c52c8735472bb8259e9a6477e179a9ea26e7a695a",
+//!   "latitude": 0.0,
+//!   "longitude": 0.0,
+//!   "password_hash": "<redacted>"
+//!}"#,
+//!   output,
+//! )
+//!
+//! ```
+//!
+//! ### Available attributes
+//!
+//! | Attribute | Description                                                                                                                                             | Feature   |
+//! | ---       | ---                                                                                                                                                     | ---       |
+//! | `as`      | provide a value that this field should be set to when redacted. e.g. `Default::default()` or `"<redacted>".to_string()`                                 | -         |
+//! | `with`    | provide a function that will be called when redacting this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+//! | `all`     | can be used instead of specifying `#[redact]` on every field/variant in a struct or enum                                                                | -         |
+//! | `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
+//! | `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
+//!
+//!
+
 use std::ops::{Deref, DerefMut};
 
 pub use redact_derive::*;
@@ -9,10 +81,20 @@ pub use primitives::*;
 #[doc(hidden)]
 pub use ::zeroize;
 
+#[cfg(feature = "zeroize")]
+use secrecy::Secret;
+#[cfg(feature = "zeroize")]
+use zeroize::{DefaultIsZeroes, Zeroize};
+
+#[cfg(feature = "zeroize")]
+#[doc(hidden)]
+pub use ::secrecy;
+
 #[cfg(feature = "serde")]
 #[doc(hidden)]
 pub use ::serde;
 
+/// Trait for recursively redacting values marked as sensitive
 pub trait Redact {
     fn redact(self) -> Self
     where
@@ -48,9 +130,11 @@ where
 }
 
 /// [Redacted] is a type guard that can be used to ensure that values have been redacted. It is
-/// impossible to construct Redacted<T> with an unredacted T.
+/// impossible to construct `Redacted<T>` with an unredacted T.
 ///
-/// # Usage
+/// The
+///
+/// ### Usage
 ///
 /// ```rust
 /// use redact::{Redact, Redacted};
@@ -128,5 +212,19 @@ where
         Self: Sized,
     {
         self.into_iter().map(Redact::redact).collect()
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T> Redact for Secret<T>
+where
+    T: DefaultIsZeroes,
+    T: Zeroize,
+{
+    fn redact(self) -> Self
+    where
+        Self: Sized,
+    {
+        self
     }
 }

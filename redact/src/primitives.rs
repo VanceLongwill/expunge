@@ -152,4 +152,3 @@ impl Redact for String {
         Self::default()
     }
 }
-

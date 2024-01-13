@@ -81,9 +81,8 @@ impl Builder {
 
         let zeroizer = if zeroize {
             quote! {
-                use ::redact::zeroize::Zeroize;
-                let mut ident = #ident;
-                (&mut #ident).zeroize(); 
+                use ::redact::secrecy::Secret;
+                let _ = Secret::new(#ident);
             }
         } else {
             TokenStream::default()
@@ -95,11 +94,9 @@ impl Builder {
                 #ident = #redact_as;
             }),
             (None, Some(redact_with)) => Ok(quote_spanned! { span =>
-                #zeroizer
                 #ident = #redact_with(#ident);
             }),
             (None, None) => Ok(quote_spanned! { span =>
-                #zeroizer
                 #ident = #ident.redact();
             }),
             _ => Err(syn::Error::new(
@@ -149,7 +146,7 @@ fn parse_attributes(
                     if builder.redact_with.is_some() {
                         return Err(syn::Error::new(
                             meta.path.span(),
-                            format!("`{:?}` cannot be combined with `with`", meta.path),
+                            format!("`{AS}` cannot be combined with `{WITH}`"),
                         ));
                     }
                     let expr: Expr = meta.value()?.parse()?;
@@ -159,7 +156,7 @@ fn parse_attributes(
                     if builder.redact_as.is_some() {
                         return Err(syn::Error::new(
                             meta.path.span(),
-                            format!("`{:?}` cannot be combined with `as`", meta.path),
+                            format!("`{WITH}` cannot be combined with `{AS}`"),
                         ));
                     }
                     let expr: Expr = meta.value()?.parse()?;
@@ -169,7 +166,7 @@ fn parse_attributes(
                     if is_container {
                         return Err(syn::Error::new(
                             meta.path.span(),
-                            format!("`{:?}` is not permitted on containers", meta.path),
+                            format!("`{IGNORE}` is not permitted on containers"),
                         ));
                     }
                     builder.ignore = true;
@@ -177,26 +174,35 @@ fn parse_attributes(
                 } else if meta.path.is_ident(ALL) {
                     if !is_container {
                         return Err(syn::Error::new(
-                            meta.path.span(),
-                            format!(
-                                "`{:?}` is not permitted on fields and variant, use #[redact] instead",
-                                meta.path
-                            ),
+                                meta.path.span(), 
+                                format!("`{ALL}` is not permitted on fields or variants, use #[redact] instead"),
                         ));
                     }
                     builder.all = true;
                     Ok(())
                 } else if meta.path.is_ident(ZEROIZE) {
                     if cfg!(feature = "zeroize") {
+                        if builder.redact_with.is_some() {
+                            return Err(syn::Error::new(
+                                meta.path.span(),
+                                format!("`{ZEROIZE}` cannot be combined with `{WITH}`"),
+                            ));
+                        }
+                        if builder.redact_as.is_none() {
+                            return Err(syn::Error::new(
+                                meta.path.span(),
+                                format!("`{ZEROIZE}` requires that `{AS}` be specified since it consumes the value"),
+                            ));
+                        }
                         builder.zeroize = true;
                         Ok(())
                     } else {
                         Err(syn::Error::new(
                             meta.path.span(),
-                            "the `zeroize` feature must be enabled",
+                            format!("the `{ZEROIZE}` feature must be enabled"),
                         ))
                     }
-                } 
+                }
                 else {
                     Err(syn::Error::new(
                         meta.path.span(),

@@ -1,6 +1,50 @@
-# Expunge
+# Redact
 
 A crate for redacting and transforming sensitive fields.
+
+## Basic usage
+
+```rust
+use redact::Redact;
+
+#[derive(Redact)]
+struct User {
+  id: i64,
+  #[redact(as = "John")]
+  first_name: String,
+  #[redact(as = "Doe")]
+  last_name: String,
+  #[redact(with = sha256::digest)]
+  date_of_birth: String,
+  #[redact]
+  latitude: f64,
+  #[redact]
+  longitude: f64,
+  #[redact(as = "<redacted>", zeroize)]
+  password_hash: String,
+}
+
+let user = User{
+    id: 101,
+    first_name: "Randy",
+    last_name: "Lahey",
+    date_of_birth: "02/02/1960",
+    latitude: 45.0778,
+    longitude: 63.546,
+    password_hash: "2f089e52def4cec8b911883fecdd6d8febe9c9f362d15e3e33feb2c12f07ccc1"
+}
+
+let redacted_user = user.redact();
+
+```
+
+| Attribute | Description                                                                                                                                             | Feature   |
+| ---       | ---                                                                                                                                                     | ---       |
+| `as`      | provide a value that this field should be set to when redacted. e.g. `Default::default()` or `"<redacted>".to_string()`                                 | -         |
+| `with`    | provide a function that will be called when redacting this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+| `all`     | can be used instead of specifying `#[redact]` on every field/variant in a struct or enum                                                                | -         |
+| `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
+| `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
 
 ## About
 
@@ -33,7 +77,7 @@ so it cannot be initialized with unredacted data.
 | [redact](https://crates.io/crates/redact)     | :x:                | :white_check_mark:      | :white_check_mark: | :x:                      | :x:                 |
 | [veil](https://crates.io/crates/veil)         | :white_check_mark: | :white_check_mark:      | :x:                | :x:                      | :x:                 |
 | [redacted](https://crates.io/crates/redacted) | :x:                | :white_check_mark:      | :x:                | :x:                      | :x:                 |
-| [expunge](#Expunge)                           | :white_check_mark: | :x:                     | :white_check_mark: | :white_check_mark:       | :white_check_mark:  |
+| [redact](#Redact)                             | :white_check_mark: | :x:                     | :white_check_mark: | :white_check_mark:       | :white_check_mark:  |
 
 
 ## Contributing

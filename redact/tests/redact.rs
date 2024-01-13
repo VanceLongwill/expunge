@@ -222,10 +222,10 @@ fn it_works_enum() {
         WithUnit(i32, UnitStruct),
         #[redact(as = Default::default())]
         DoesntImplementRedact(Unredactable),
-        #[redact(zeroize)]
+        #[redact(as = i32::MAX, zeroize)]
         Zeroizable(i32),
-        #[redact(zeroize, as = 99)]
-        ZeroizableAs(i32),
+        #[redact(as = "99".to_string(), zeroize)]
+        ZeroizableString(String),
     }
 
     #[derive(PartialEq, Debug, Clone, Default)]
@@ -275,4 +275,12 @@ fn it_works_enum() {
         SensitiveItem::LocationHistory(vec![Location::default(), Location::default()],),
         redacted
     );
+
+    let item = SensitiveItem::Zeroizable(12309812);
+    let redacted = item.redact();
+    assert_eq!(SensitiveItem::Zeroizable(2147483647), redacted);
+
+    let item = SensitiveItem::ZeroizableString("my_password".to_string());
+    let redacted = item.redact();
+    assert_eq!(SensitiveItem::ZeroizableString("99".to_string()), redacted);
 }
