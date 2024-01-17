@@ -5,37 +5,52 @@ A crate for redacting and transforming sensitive fields.
 ## Basic usage
 
 ```rust
-use redact::Redact;
+ use redact::Redact;
+ use serde::{Serialize, Deserialize};
 
-#[derive(Redact)]
-struct User {
-  id: i64,
-  #[redact(as = "John")]
-  first_name: String,
-  #[redact(as = "Doe")]
-  last_name: String,
-  #[redact(with = sha256::digest)]
-  date_of_birth: String,
-  #[redact]
-  latitude: f64,
-  #[redact]
-  longitude: f64,
-  #[redact(as = "<redacted>", zeroize)]
-  password_hash: String,
-}
+ #[derive(Clone, Debug, Serialize, Deserialize, Redact)]
+ struct User {
+   id: i64, // fields without #[redact] annotations are left as is
+   #[redact(as = "Randy".to_string())]
+   first_name: String,
+   #[redact(as = "Lahey".to_string())]
+   last_name: String,
+   #[redact(with = sha256::digest)]
+   date_of_birth: String,
+   #[redact]
+   latitude: f64,
+   #[redact]
+   longitude: f64,
+   #[redact(as = "<redacted>".to_string(), zeroize)]
+   password_hash: String,
+ }
 
-let user = User{
-    id: 101,
-    first_name: "Randy",
-    last_name: "Lahey",
-    date_of_birth: "02/02/1960",
-    latitude: 45.0778,
-    longitude: 63.546,
-    password_hash: "2f089e52def4cec8b911883fecdd6d8febe9c9f362d15e3e33feb2c12f07ccc1"
-}
+ let user = User{
+   id: 101,
+   first_name: "Ricky".to_string(),
+   last_name: "LaFleur".to_string(),
+   date_of_birth: "02/02/1960".to_string(),
+   latitude: 45.0778,
+   longitude: 63.546,
+   password_hash: "2f089e52def4cec8b911883fecdd6d8febe9c9f362d15e3e33feb2c12f07ccc1".to_string(),
+ };
 
-let redacted_user = user.redact();
+ let redacted_user = user.redact();
 
+ let output = serde_json::to_string_pretty(&redacted_user).expect("should serialize");
+
+ assert_eq!(
+   r#"{
+   "id": 101,
+   "first_name": "Randy",
+   "last_name": "Lahey",
+   "date_of_birth": "eeb98c815ae11240b563892c52c8735472bb8259e9a6477e179a9ea26e7a695a",
+   "latitude": 0.0,
+   "longitude": 0.0,
+   "password_hash": "<redacted>"
+}"#,
+   output,
+ )
 ```
 
 | Attribute | Description                                                                                                                                             | Feature   |
@@ -71,13 +86,13 @@ so it cannot be initialized with unredacted data.
 
 ### Comparison
 
-| crate                                         | proc_macro         | overrides Display/Debug | serde support      | toggle on/off at runtime | uses original types |
-| --                                            | -                  | -                       | -                  | -                        | -                   |
-| [secrecy](https://crates.io/crates/secrecy)   | :x:                | :white_check_mark:      | :white_check_mark: | :x:                      | :x:                 |
-| [redact](https://crates.io/crates/redact)     | :x:                | :white_check_mark:      | :white_check_mark: | :x:                      | :x:                 |
-| [veil](https://crates.io/crates/veil)         | :white_check_mark: | :white_check_mark:      | :x:                | :x:                      | :x:                 |
-| [redacted](https://crates.io/crates/redacted) | :x:                | :white_check_mark:      | :x:                | :x:                      | :x:                 |
-| [redact](#Redact)                             | :white_check_mark: | :x:                     | :white_check_mark: | :white_check_mark:       | :white_check_mark:  |
+| crate                                         | proc_macro         | implements Display/Debug | serde support      | toggle on/off at runtime | uses original types |
+| --                                            | -                  | -                        | -                  | -                        | -                   |
+| [secrecy](https://crates.io/crates/secrecy)   | :x:                | :white_check_mark:       | :white_check_mark: | :x:                      | :x:                 |
+| [redact](https://crates.io/crates/redact)     | :x:                | :white_check_mark:       | :white_check_mark: | :x:                      | :x:                 |
+| [veil](https://crates.io/crates/veil)         | :white_check_mark: | :white_check_mark:       | :x:                | :x:                      | :x:                 |
+| [redacted](https://crates.io/crates/redacted) | :x:                | :white_check_mark:       | :x:                | :x:                      | :x:                 |
+| [redact](#Redact)                             | :white_check_mark: | :x:                      | :white_check_mark: | :white_check_mark:       | :white_check_mark:  |
 
 
 ## Contributing

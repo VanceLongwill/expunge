@@ -30,13 +30,13 @@
 //! }
 //!
 //! let user = User{
-//!     id: 101,
-//!     first_name: "Ricky".to_string(),
-//!     last_name: "LaFleur".to_string(),
-//!     date_of_birth: "02/02/1960".to_string(),
-//!     latitude: 45.0778,
-//!     longitude: 63.546,
-//!     password_hash: "2f089e52def4cec8b911883fecdd6d8febe9c9f362d15e3e33feb2c12f07ccc1".to_string(),
+//!   id: 101,
+//!   first_name: "Ricky".to_string(),
+//!   last_name: "LaFleur".to_string(),
+//!   date_of_birth: "02/02/1960".to_string(),
+//!   latitude: 45.0778,
+//!   longitude: 63.546,
+//!   password_hash: "2f089e52def4cec8b911883fecdd6d8febe9c9f362d15e3e33feb2c12f07ccc1".to_string(),
 //! };
 //!
 //! let redacted_user = user.redact();
@@ -70,7 +70,10 @@
 //!
 //!
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::{Deref, DerefMut},
+};
 
 pub use redact_derive::*;
 
@@ -206,6 +209,31 @@ where
 impl<T> Redact for Vec<T>
 where
     T: Redact,
+{
+    fn redact(self) -> Self
+    where
+        Self: Sized,
+    {
+        self.into_iter().map(Redact::redact).collect()
+    }
+}
+
+impl<K, V> Redact for HashMap<K, V>
+where
+    K: std::hash::Hash + std::cmp::Eq,
+    V: Redact,
+{
+    fn redact(self) -> Self
+    where
+        Self: Sized,
+    {
+        self.into_iter().map(|(k, v)| (k, v.redact())).collect()
+    }
+}
+
+impl<T> Redact for HashSet<T>
+where
+    T: Redact + std::hash::Hash + std::cmp::Eq,
 {
     fn redact(self) -> Self
     where
