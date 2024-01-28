@@ -3,4 +3,14 @@ members = [
     "expunge",
     "expunge_derive",
 ]
+default-members = ["expunge"]
 resolver = "2"
+
+[workspace.package]
+description = "A simple crate to expunge, redact and transform struct fields declaratively"
+keywords = ["sensitive", "redact", "pii", "secret", "zeroize"]
+readme = "README.md"
+documentation = "https://docs.rs/expunge"
+repository = "https://github.com/vancelongwill/expunge"
+homepage = "https://github.com/vancelongwill/expunge"
+license = "MIT"
