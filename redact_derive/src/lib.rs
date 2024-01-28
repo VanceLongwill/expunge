@@ -7,16 +7,16 @@ use syn::{
     DeriveInput, Expr, Field, Fields, GenericParam, Generics, Index, Meta,
 };
 
-#[proc_macro_derive(Redact, attributes(redact))]
-pub fn redact_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_derive(Expunge, attributes(expunge))]
+pub fn expunge_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    match try_redact_derive(input) {
+    match try_expunge_derive(input) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }
 }
 
-fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
+fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let span = input.span();
     let builder = parse_attributes(span, None, input.attrs)?.unwrap_or_default();
     let impls = match input.data {
@@ -35,9 +35,9 @@ fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let expanded = quote! {
-        impl #impl_generics redact::Redact for #name #ty_generics #where_clause {
-            fn redact(self) -> Self {
-                use ::redact::*;
+        impl #impl_generics expunge::Expunge for #name #ty_generics #where_clause {
+            fn expunge(self) -> Self {
+                use ::expunge::*;
 
                 #impls
             }
@@ -47,11 +47,11 @@ fn try_redact_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     Ok(expanded)
 }
 
-// Add a bound `T: redact::Redact` to every type parameter T.
+// Add a bound `T: expunge::Expunge` to every type parameter T.
 fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
-            type_param.bounds.push(parse_quote!(redact::Redact));
+            type_param.bounds.push(parse_quote!(expunge::Expunge));
         }
     }
     generics
@@ -59,8 +59,8 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
 
 #[derive(Debug, Clone, Default)]
 struct Builder {
-    redact_as: Option<TokenStream>,
-    redact_with: Option<TokenStream>,
+    expunge_as: Option<TokenStream>,
+    expunge_with: Option<TokenStream>,
     ignore: bool,
     all: bool,
     zeroize: bool,
@@ -69,8 +69,8 @@ struct Builder {
 impl Builder {
     fn build(self, span: Span, ident: TokenStream) -> Result<TokenStream, syn::Error> {
         let Self {
-            redact_as,
-            redact_with,
+            expunge_as,
+            expunge_with,
             ignore,
             all: _,
             zeroize,
@@ -81,23 +81,23 @@ impl Builder {
 
         let zeroizer = if zeroize {
             quote! {
-                use ::redact::secrecy::Secret;
+                use ::expunge::secrecy::Secret;
                 let _ = Secret::new(#ident);
             }
         } else {
             TokenStream::default()
         };
 
-        match (redact_as, redact_with) {
-            (Some(redact_as), None) => Ok(quote_spanned! { span =>
+        match (expunge_as, expunge_with) {
+            (Some(expunge_as), None) => Ok(quote_spanned! { span =>
                 #zeroizer
-                #ident = #redact_as;
+                #ident = #expunge_as;
             }),
-            (None, Some(redact_with)) => Ok(quote_spanned! { span =>
-                #ident = #redact_with(#ident);
+            (None, Some(expunge_with)) => Ok(quote_spanned! { span =>
+                #ident = #expunge_with(#ident);
             }),
             (None, None) => Ok(quote_spanned! { span =>
-                #ident = #ident.redact();
+                #ident = #ident.expunge();
             }),
             _ => Err(syn::Error::new(
                 span,
@@ -120,7 +120,7 @@ fn parse_attributes(
 ) -> Result<Option<Builder>, syn::Error> {
     let attrs: Vec<_> = attrs
         .into_iter()
-        .filter(|attr| attr.path().is_ident("redact"))
+        .filter(|attr| attr.path().is_ident("expunge"))
         .collect();
 
     let is_container = parent.is_none();
@@ -134,7 +134,7 @@ fn parse_attributes(
                 return parent
                     .ok_or(syn::Error::new(
                         attr.meta.span(),
-                        "`#[redact]` can only be used to mark fields & variants".to_string(),
+                        "`#[expunge]` can only be used to mark fields & variants".to_string(),
                     ))
                     .map(Some);
             }
@@ -143,24 +143,24 @@ fn parse_attributes(
 
             attr.parse_nested_meta(|meta| {
                 if meta.path.is_ident(AS) {
-                    if builder.redact_with.is_some() {
+                    if builder.expunge_with.is_some() {
                         return Err(syn::Error::new(
                             meta.path.span(),
                             format!("`{AS}` cannot be combined with `{WITH}`"),
                         ));
                     }
                     let expr: Expr = meta.value()?.parse()?;
-                    builder.redact_as = Some(expr.into_token_stream());
+                    builder.expunge_as = Some(expr.into_token_stream());
                     Ok(())
                 } else if meta.path.is_ident(WITH) {
-                    if builder.redact_as.is_some() {
+                    if builder.expunge_as.is_some() {
                         return Err(syn::Error::new(
                             meta.path.span(),
                             format!("`{WITH}` cannot be combined with `{AS}`"),
                         ));
                     }
                     let expr: Expr = meta.value()?.parse()?;
-                    builder.redact_with = Some(expr.into_token_stream());
+                    builder.expunge_with = Some(expr.into_token_stream());
                     Ok(())
                 } else if meta.path.is_ident(IGNORE) {
                     if is_container {
@@ -175,20 +175,20 @@ fn parse_attributes(
                     if !is_container {
                         return Err(syn::Error::new(
                                 meta.path.span(), 
-                                format!("`{ALL}` is not permitted on fields or variants, use #[redact] instead"),
+                                format!("`{ALL}` is not permitted on fields or variants, use #[expunge] instead"),
                         ));
                     }
                     builder.all = true;
                     Ok(())
                 } else if meta.path.is_ident(ZEROIZE) {
                     if cfg!(feature = "zeroize") {
-                        if builder.redact_with.is_some() {
+                        if builder.expunge_with.is_some() {
                             return Err(syn::Error::new(
                                 meta.path.span(),
                                 format!("`{ZEROIZE}` cannot be combined with `{WITH}`"),
                             ));
                         }
-                        if builder.redact_as.is_none() {
+                        if builder.expunge_as.is_none() {
                             return Err(syn::Error::new(
                                 meta.path.span(),
                                 format!("`{ZEROIZE}` requires that `{AS}` be specified since it consumes the value"),
@@ -215,7 +215,7 @@ fn parse_attributes(
         }
         n => Err(syn::Error::new(
             span,
-            format!("expected 1 or 0 `redact` tags, found {n}"),
+            format!("expected 1 or 0 `expunge` tags, found {n}"),
         )),
     }
 }
@@ -234,16 +234,16 @@ fn derive_fields(
             let builder = parse_attributes(span, Some(parent.clone()), field.attrs)?
                 .map(|f| {
                     let Builder {
-                        redact_as,
-                        redact_with,
+                        expunge_as,
+                        expunge_with,
                         ignore,
                         all,
                         zeroize,
                     } = f;
-                    let (redact_as, redact_with) = match (redact_as, redact_with) {
+                    let (expunge_as, expunge_with) = match (expunge_as, expunge_with) {
                         (Some(ra), None) => (Some(ra), None),
                         (None, Some(rw)) => (None, Some(rw)),
-                        (None, None) => (parent.redact_as.clone(), parent.redact_with.clone()),
+                        (None, None) => (parent.expunge_as.clone(), parent.expunge_with.clone()),
                         (Some(_), Some(_)) => {
                             return Err(syn::Error::new(span, "`as` and `with` cannot be combined"))
                         }
@@ -252,8 +252,8 @@ fn derive_fields(
                     let all = all || parent.all;
                     let zeroize = zeroize || parent.zeroize;
                     Ok(Builder {
-                        redact_as,
-                        redact_with,
+                        expunge_as,
+                        expunge_with,
                         ignore,
                         all,
                         zeroize,
@@ -367,7 +367,7 @@ fn derive_enum(e: DataEnum, parent: Builder) -> Result<TokenStream, syn::Error> 
         .map(|variant| {
             let parent = parse_attributes(span, Some(parent.clone()), variant.attrs.clone())?
                 .map(|mut p| {
-                    // the `#[redact]` tag on an enum variant is equivalent to `#[redact(all)]`
+                    // the `#[expunge]` tag on an enum variant is equivalent to `#[expunge(all)]`
                     p.all = true;
                     p
                 })

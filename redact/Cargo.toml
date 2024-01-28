@@ -1,18 +1,18 @@
 [package]
-name = "redact"
+name = "expunge"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-redact_derive = { path = "../redact_derive" }
+expunge_derive = { path = "../expunge_derive" }
 zeroize = { version = "1.7.0", optional = true }
 secrecy = { version = "0.8.0", optional = true }
 serde = { version = "1.0", optional = true }
 
 [dev-dependencies]
-redact_derive = { path = "../redact_derive", features = ["all"] }
+expunge_derive = { path = "../expunge_derive", features = ["all"] }
 sha256 = "1.4.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "redact",
-    "redact_derive",
+    "expunge",
+    "expunge_derive",
 ]
 resolver = "2"

@@ -1,32 +1,32 @@
-use redact::Redact;
+use expunge::Expunge;
 
 #[test]
 fn it_works_struct() {
-    #[derive(Clone, Redact)]
+    #[derive(Clone, Expunge)]
     struct User<G> {
-        #[redact]
+        #[expunge]
         pub first_name: String,
-        #[redact]
+        #[expunge]
         pub middle_name: Option<String>,
-        #[redact(as = "anon.".to_string())]
+        #[expunge(as = "anon.".to_string())]
         pub last_name: String,
-        #[redact(with = sha256::digest)]
+        #[expunge(with = sha256::digest)]
         pub address: String,
         pub id: u64,
-        #[redact]
+        #[expunge]
         pub location: Location,
-        #[redact]
+        #[expunge]
         pub initial_location: G,
         #[allow(dead_code)]
-        #[redact(ignore)]
+        #[expunge(ignore)]
         pub some_unit: UnitStruct,
     }
 
     #[derive(Clone)]
     struct UnitStruct;
 
-    impl Redact for UnitStruct {
-        fn redact(self) -> Self
+    impl Expunge for UnitStruct {
+        fn expunge(self) -> Self
         where
             Self: Sized,
         {
@@ -34,9 +34,9 @@ fn it_works_struct() {
         }
     }
 
-    #[derive(Clone, Redact)]
+    #[derive(Clone, Expunge)]
     struct Location {
-        #[redact]
+        #[expunge]
         city: String,
     }
 
@@ -57,47 +57,47 @@ fn it_works_struct() {
 
     let original = user.clone();
 
-    let redacted = user.redact();
+    let expungeed = user.expunge();
 
-    assert_eq!("", redacted.first_name);
+    assert_eq!("", expungeed.first_name);
     assert_eq!(
-        "", redacted.location.city,
-        "it should redact nested structs"
+        "", expungeed.location.city,
+        "it should expunge nested structs"
     );
 
     assert_eq!(
-        "", redacted.initial_location.city,
-        "it should redact generic values"
+        "", expungeed.initial_location.city,
+        "it should expunge generic values"
     );
 
     assert_eq!(
         Some("".to_string()),
-        redacted.middle_name,
-        "it should redact optional values"
+        expungeed.middle_name,
+        "it should expunge optional values"
     );
 
     assert_eq!(
-        "anon.", redacted.last_name,
+        "anon.", expungeed.last_name,
         "the `as` attribute can be used to provide a literal value"
     );
     assert_eq!(
-        "75f6ac468f71b588f1f6e5d10e468efffab086a9e440c378d8018a7b3ff28b45", redacted.address,
+        "75f6ac468f71b588f1f6e5d10e468efffab086a9e440c378d8018a7b3ff28b45", expungeed.address,
         "the `with` attribute can be used to hash etc"
     );
     assert_eq!(
-        original.id, redacted.id,
-        "fields without the redact attribute should be left as is"
+        original.id, expungeed.id,
+        "fields without the expunge attribute should be left as is"
     );
 }
 
 #[test]
 fn it_works_unnamed_struct() {
-    #[derive(Redact)]
-    struct User(String, #[redact] Location);
+    #[derive(Expunge)]
+    struct User(String, #[expunge] Location);
 
-    #[derive(Redact)]
+    #[derive(Expunge)]
     struct Location {
-        #[redact]
+        #[expunge]
         city: String,
     }
 
@@ -108,32 +108,32 @@ fn it_works_unnamed_struct() {
         },
     );
 
-    let redacted = user.redact();
+    let expungeed = user.expunge();
 
-    assert_eq!("Bob", redacted.0);
-    assert_eq!("", redacted.1.city,);
+    assert_eq!("Bob", expungeed.0);
+    assert_eq!("", expungeed.1.city,);
 }
 
 #[test]
 fn it_works_struct_all() {
-    #[derive(Clone, Redact)]
-    #[redact(all)]
+    #[derive(Clone, Expunge)]
+    #[expunge(all)]
     struct User<G> {
         pub first_name: String,
         pub middle_name: Option<String>,
-        #[redact(as = "anon.".to_string())]
+        #[expunge(as = "anon.".to_string())]
         pub last_name: String,
-        #[redact(with = sha256::digest)]
+        #[expunge(with = sha256::digest)]
         pub address: String,
-        #[redact(ignore)]
+        #[expunge(ignore)]
         pub id: u64,
         pub location: Location,
         pub initial_location: G,
     }
 
-    #[derive(Clone, Redact)]
+    #[derive(Clone, Expunge)]
     struct Location {
-        #[redact]
+        #[expunge]
         city: String,
     }
 
@@ -153,51 +153,51 @@ fn it_works_struct_all() {
 
     let original = user.clone();
 
-    let redacted = user.redact();
+    let expungeed = user.expunge();
 
-    assert_eq!("", redacted.first_name);
+    assert_eq!("", expungeed.first_name);
     assert_eq!(
-        "", redacted.location.city,
-        "it should redact nested structs"
+        "", expungeed.location.city,
+        "it should expunge nested structs"
     );
 
     assert_eq!(
-        "", redacted.initial_location.city,
-        "it should redact generic values"
+        "", expungeed.initial_location.city,
+        "it should expunge generic values"
     );
 
     assert_eq!(
         Some("".to_string()),
-        redacted.middle_name,
-        "it should redact optional values"
+        expungeed.middle_name,
+        "it should expunge optional values"
     );
 
     assert_eq!(
-        "anon.", redacted.last_name,
+        "anon.", expungeed.last_name,
         "the `as` attribute can be used to provide a literal value"
     );
     assert_eq!(
-        "75f6ac468f71b588f1f6e5d10e468efffab086a9e440c378d8018a7b3ff28b45", redacted.address,
+        "75f6ac468f71b588f1f6e5d10e468efffab086a9e440c378d8018a7b3ff28b45", expungeed.address,
         "the `with` attribute can be used to hash etc"
     );
     assert_eq!(
-        original.id, redacted.id,
-        "fields without the redact attribute should be left as is"
+        original.id, expungeed.id,
+        "fields without the expunge attribute should be left as is"
     );
 }
 
 #[test]
 fn it_works_enum() {
-    #[derive(PartialEq, Debug, Clone, Redact)]
+    #[derive(PartialEq, Debug, Clone, Expunge)]
     enum SensitiveNested {
-        Name(#[redact] String, i32),
+        Name(#[expunge] String, i32),
     }
 
     #[derive(Clone, Debug, PartialEq)]
     struct UnitStruct;
 
-    impl Redact for UnitStruct {
-        fn redact(self) -> Self
+    impl Expunge for UnitStruct {
+        fn expunge(self) -> Self
         where
             Self: Sized,
         {
@@ -205,82 +205,82 @@ fn it_works_enum() {
         }
     }
 
-    #[derive(PartialEq, Debug, Clone, Redact)]
+    #[derive(PartialEq, Debug, Clone, Expunge)]
     enum SensitiveItem {
-        Name(#[redact] String, i32),
+        Name(#[expunge] String, i32),
         DateOfBirth(String),
         BankDetails {
-            #[redact]
+            #[expunge]
             account_number: i32,
         },
-        Location(#[redact] Location),
-        #[redact]
+        Location(#[expunge] Location),
+        #[expunge]
         Nested(SensitiveNested, i32),
-        #[redact]
+        #[expunge]
         LocationHistory(Vec<Location>),
-        #[redact]
+        #[expunge]
         WithUnit(i32, UnitStruct),
-        #[redact(as = Default::default())]
-        DoesntImplementRedact(Unredactable),
-        #[redact(as = i32::MAX, zeroize)]
+        #[expunge(as = Default::default())]
+        DoesntImplementExpunge(Unexpungeable),
+        #[expunge(as = i32::MAX, zeroize)]
         Zeroizable(i32),
-        #[redact(as = "99".to_string(), zeroize)]
+        #[expunge(as = "99".to_string(), zeroize)]
         ZeroizableString(String),
     }
 
     #[derive(PartialEq, Debug, Clone, Default)]
-    struct Unredactable {
+    struct Unexpungeable {
         name: String,
     }
 
-    #[derive(PartialEq, Debug, Clone, Redact, Default)]
+    #[derive(PartialEq, Debug, Clone, Expunge, Default)]
     struct Location {
-        #[redact]
+        #[expunge]
         city: String,
     }
 
     let item = SensitiveItem::Name("Bob".to_string(), 1);
 
-    let redacted = item.redact();
+    let expungeed = item.expunge();
 
-    assert_eq!(SensitiveItem::Name("".to_string(), 1), redacted);
+    assert_eq!(SensitiveItem::Name("".to_string(), 1), expungeed);
 
     let item = SensitiveItem::BankDetails {
         account_number: 123,
     };
-    let redacted = item.redact();
-    assert_eq!(SensitiveItem::BankDetails { account_number: 0 }, redacted);
+    let expungeed = item.expunge();
+    assert_eq!(SensitiveItem::BankDetails { account_number: 0 }, expungeed);
 
     let new_york = Location {
         city: "New York".to_string(),
     };
     let item = SensitiveItem::Location(new_york.clone());
 
-    let redacted = item.redact();
-    assert_eq!(SensitiveItem::Location(Location::default()), redacted);
+    let expungeed = item.expunge();
+    assert_eq!(SensitiveItem::Location(Location::default()), expungeed);
 
     let item = SensitiveItem::Nested(SensitiveNested::Name("Alice".to_string(), 1), 99);
-    let redacted = item.redact();
+    let expungeed = item.expunge();
     assert_eq!(
         SensitiveItem::Nested(SensitiveNested::Name("".to_string(), 1), 0),
-        redacted
+        expungeed
     );
 
     let boston = Location {
         city: "Boston".to_string(),
     };
     let item = SensitiveItem::LocationHistory(vec![new_york, boston]);
-    let redacted = item.redact();
+    let expungeed = item.expunge();
     assert_eq!(
         SensitiveItem::LocationHistory(vec![Location::default(), Location::default()],),
-        redacted
+        expungeed
     );
 
     let item = SensitiveItem::Zeroizable(12309812);
-    let redacted = item.redact();
-    assert_eq!(SensitiveItem::Zeroizable(2147483647), redacted);
+    let expungeed = item.expunge();
+    assert_eq!(SensitiveItem::Zeroizable(2147483647), expungeed);
 
     let item = SensitiveItem::ZeroizableString("my_password".to_string());
-    let redacted = item.redact();
-    assert_eq!(SensitiveItem::ZeroizableString("99".to_string()), redacted);
+    let expungeed = item.expunge();
+    assert_eq!(SensitiveItem::ZeroizableString("99".to_string()), expungeed);
 }

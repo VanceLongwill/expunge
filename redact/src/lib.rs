@@ -1,31 +1,31 @@
-//! Redact provides a straightfoward macro-based approach for dealing with
+//! Expunge provides a straightfoward macro-based approach for dealing with
 //! sensitive values.
 //!
 //! Keeping track of which values are sensitive (e.g. PII, secrets) is as simple as
-//! marking them with the `#[redact]` attribute. Then, when you need a sanitized copy of your data,
-//! simply do `let sanitized = data.redact();`. If no other redact behaviour is specified (see `as`
+//! marking them with the `#[expunge]` attribute. Then, when you need a sanitized copy of your data,
+//! simply do `let sanitized = data.expunge();`. If no other expunge behaviour is specified (see `as`
 //! & `with`), the field will be replaced with its default value.
 //!
 //! ### Usage
 //!
 //! ```rust
-//! use redact::Redact;
+//! use expunge::Expunge;
 //! use serde::{Serialize, Deserialize};
 //!
-//! #[derive(Clone, Debug, Serialize, Deserialize, Redact)]
+//! #[derive(Clone, Debug, Serialize, Deserialize, Expunge)]
 //! struct User {
-//!   id: i64, // fields without #[redact] annotations are left as is
-//!   #[redact(as = "Randy".to_string())]
+//!   id: i64, // fields without #[expunge] annotations are left as is
+//!   #[expunge(as = "Randy".to_string())]
 //!   first_name: String,
-//!   #[redact(as = "Lahey".to_string())]
+//!   #[expunge(as = "Lahey".to_string())]
 //!   last_name: String,
-//!   #[redact(with = sha256::digest)]
+//!   #[expunge(with = sha256::digest)]
 //!   date_of_birth: String,
-//!   #[redact]
+//!   #[expunge]
 //!   latitude: f64,
-//!   #[redact]
+//!   #[expunge]
 //!   longitude: f64,
-//!   #[redact(as = "<redacted>".to_string(), zeroize)]
+//!   #[expunge(as = "<expungeed>".to_string(), zeroize)]
 //!   password_hash: String,
 //! }
 //!
@@ -39,9 +39,9 @@
 //!   password_hash: "2f089e52def4cec8b911883fecdd6d8febe9c9f362d15e3e33feb2c12f07ccc1".to_string(),
 //! };
 //!
-//! let redacted_user = user.redact();
+//! let expungeed_user = user.expunge();
 //!
-//! let output = serde_json::to_string_pretty(&redacted_user).expect("should serialize");
+//! let output = serde_json::to_string_pretty(&expungeed_user).expect("should serialize");
 //!
 //! assert_eq!(
 //!   r#"{
@@ -51,7 +51,7 @@
 //!   "date_of_birth": "eeb98c815ae11240b563892c52c8735472bb8259e9a6477e179a9ea26e7a695a",
 //!   "latitude": 0.0,
 //!   "longitude": 0.0,
-//!   "password_hash": "<redacted>"
+//!   "password_hash": "<expungeed>"
 //!}"#,
 //!   output,
 //! )
@@ -62,9 +62,9 @@
 //!
 //! | Attribute | Description                                                                                                                                             | Feature   |
 //! | ---       | ---                                                                                                                                                     | ---       |
-//! | `as`      | provide a value that this field should be set to when redacted. e.g. `Default::default()` or `"<redacted>".to_string()`                                 | -         |
-//! | `with`    | provide a function that will be called when redacting this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
-//! | `all`     | can be used instead of specifying `#[redact]` on every field/variant in a struct or enum                                                                | -         |
+//! | `as`      | provide a value that this field should be set to when expungeed. e.g. `Default::default()` or `"<expungeed>".to_string()`                                 | -         |
+//! | `with`    | provide a function that will be called when expungeing this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+//! | `all`     | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                                | -         |
 //! | `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
 //! | `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
 //!
@@ -75,7 +75,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-pub use redact_derive::*;
+pub use expunge_derive::*;
 
 pub mod primitives;
 
@@ -96,54 +96,54 @@ pub use ::secrecy;
 #[doc(hidden)]
 pub use ::serde;
 
-/// Trait for recursively redacting values marked as sensitive
-pub trait Redact {
-    fn redact(self) -> Self
+/// Trait for recursively expungeing values marked as sensitive
+pub trait Expunge {
+    fn expunge(self) -> Self
     where
         Self: Sized;
 }
 
-impl<T> Redact for Option<T>
+impl<T> Expunge for Option<T>
 where
-    T: Redact,
+    T: Expunge,
 {
-    fn redact(self) -> Self
+    fn expunge(self) -> Self
     where
         Self: Sized,
     {
-        self.map(Redact::redact)
+        self.map(Expunge::expunge)
     }
 }
 
-impl<R, E> Redact for Result<R, E>
+impl<R, E> Expunge for Result<R, E>
 where
-    R: Redact,
-    E: Redact,
+    R: Expunge,
+    E: Expunge,
 {
-    fn redact(self) -> Self
+    fn expunge(self) -> Self
     where
         Self: Sized,
     {
         match self {
-            Ok(v) => Ok(v.redact()),
-            Err(e) => Err(e.redact()),
+            Ok(v) => Ok(v.expunge()),
+            Err(e) => Err(e.expunge()),
         }
     }
 }
 
-/// [Redacted] is a type guard that can be used to ensure that values have been redacted. It is
-/// impossible to construct `Redacted<T>` with an unredacted T.
+/// [Expungeed] is a type guard that can be used to ensure that values have been expungeed. It is
+/// impossible to construct `Expungeed<T>` with an unexpungeed T.
 ///
 /// The
 ///
 /// ### Usage
 ///
 /// ```rust
-/// use redact::{Redact, Redacted};
+/// use expunge::{Expunge, Expungeed};
 ///
-/// #[derive(Debug, Redact)]
+/// #[derive(Debug, Expunge)]
 /// struct PII {
-///     #[redact]
+///     #[expunge]
 ///     name: String,
 /// };
 ///
@@ -151,29 +151,29 @@ where
 ///
 /// do_stuff(pii.into());
 ///
-/// fn do_stuff(pii: Redacted<PII>) {
-///     println!("Some redacted pii: {pii:?}");
+/// fn do_stuff(pii: Expungeed<PII>) {
+///     println!("Some expungeed pii: {pii:?}");
 /// }
 /// ```
-pub struct Redacted<T>(T);
+pub struct Expungeed<T>(T);
 
-impl<T> From<T> for Redacted<T>
+impl<T> From<T> for Expungeed<T>
 where
-    T: Redact,
+    T: Expunge,
 {
     fn from(value: T) -> Self {
-        Redacted(value.redact())
+        Expungeed(value.expunge())
     }
 }
 
 #[allow(dead_code)]
-impl<T> Redacted<T> {
+impl<T> Expungeed<T> {
     fn into_inner(self) -> T {
         self.0
     }
 }
 
-impl<T> Deref for Redacted<T> {
+impl<T> Deref for Expungeed<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -181,13 +181,13 @@ impl<T> Deref for Redacted<T> {
     }
 }
 
-impl<T> DerefMut for Redacted<T> {
+impl<T> DerefMut for Expungeed<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T> std::fmt::Display for Redacted<T>
+impl<T> std::fmt::Display for Expungeed<T>
 where
     T: std::fmt::Display,
 {
@@ -196,7 +196,7 @@ where
     }
 }
 
-impl<T> std::fmt::Debug for Redacted<T>
+impl<T> std::fmt::Debug for Expungeed<T>
 where
     T: std::fmt::Debug,
 {
@@ -205,50 +205,50 @@ where
     }
 }
 
-impl<T> Redact for Vec<T>
+impl<T> Expunge for Vec<T>
 where
-    T: Redact,
+    T: Expunge,
 {
-    fn redact(self) -> Self
+    fn expunge(self) -> Self
     where
         Self: Sized,
     {
-        self.into_iter().map(Redact::redact).collect()
+        self.into_iter().map(Expunge::expunge).collect()
     }
 }
 
-impl<K, V> Redact for HashMap<K, V>
+impl<K, V> Expunge for HashMap<K, V>
 where
     K: std::hash::Hash + std::cmp::Eq,
-    V: Redact,
+    V: Expunge,
 {
-    fn redact(self) -> Self
+    fn expunge(self) -> Self
     where
         Self: Sized,
     {
-        self.into_iter().map(|(k, v)| (k, v.redact())).collect()
+        self.into_iter().map(|(k, v)| (k, v.expunge())).collect()
     }
 }
 
-impl<T> Redact for HashSet<T>
+impl<T> Expunge for HashSet<T>
 where
-    T: Redact + std::hash::Hash + std::cmp::Eq,
+    T: Expunge + std::hash::Hash + std::cmp::Eq,
 {
-    fn redact(self) -> Self
+    fn expunge(self) -> Self
     where
         Self: Sized,
     {
-        self.into_iter().map(Redact::redact).collect()
+        self.into_iter().map(Expunge::expunge).collect()
     }
 }
 
 #[cfg(feature = "zeroize")]
-impl<T> Redact for Secret<T>
+impl<T> Expunge for Secret<T>
 where
     T: DefaultIsZeroes,
     T: Zeroize,
 {
-    fn redact(self) -> Self
+    fn expunge(self) -> Self
     where
         Self: Sized,
     {
