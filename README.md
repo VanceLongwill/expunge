@@ -1,6 +1,6 @@
 # Expunge
 
-A crate for expungeing and transforming sensitive fields.
+A crate for expunging and transforming sensitive fields.
 
 ## Basic usage
 
@@ -56,7 +56,7 @@ A crate for expungeing and transforming sensitive fields.
 | Attribute | Description                                                                                                                                             | Feature   |
 | ---       | ---                                                                                                                                                     | ---       |
 | `as`      | provide a value that this field should be set to when expungeed. e.g. `Default::default()` or `"<expungeed>".to_string()`                                 | -         |
-| `with`    | provide a function that will be called when expungeing this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+| `with`    | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
 | `all`     | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                                | -         |
 | `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
 | `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |

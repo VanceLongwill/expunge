@@ -63,7 +63,7 @@
 //! | Attribute | Description                                                                                                                                             | Feature   |
 //! | ---       | ---                                                                                                                                                     | ---       |
 //! | `as`      | provide a value that this field should be set to when expungeed. e.g. `Default::default()` or `"<expungeed>".to_string()`                                 | -         |
-//! | `with`    | provide a function that will be called when expungeing this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+//! | `with`    | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
 //! | `all`     | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                                | -         |
 //! | `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
 //! | `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
@@ -96,7 +96,7 @@ pub use ::secrecy;
 #[doc(hidden)]
 pub use ::serde;
 
-/// Trait for recursively expungeing values marked as sensitive
+/// Trait for recursively expunging values marked as sensitive
 pub trait Expunge {
     fn expunge(self) -> Self
     where
