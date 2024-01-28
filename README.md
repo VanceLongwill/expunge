@@ -2,6 +2,8 @@
 
 A crate for expunging/redacting and transforming sensitive fields.
 
+[crates.io](https://crates.io/crates/expunge)
+
 ## Basic usage
 
 ```rust
