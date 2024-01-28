@@ -25,7 +25,7 @@
 //!   latitude: f64,
 //!   #[expunge]
 //!   longitude: f64,
-//!   #[expunge(as = "<expungeed>".to_string(), zeroize)]
+//!   #[expunge(as = "<expunged>".to_string(), zeroize)]
 //!   password_hash: String,
 //! }
 //!
@@ -39,9 +39,9 @@
 //!   password_hash: "2f089e52def4cec8b911883fecdd6d8febe9c9f362d15e3e33feb2c12f07ccc1".to_string(),
 //! };
 //!
-//! let expungeed_user = user.expunge();
+//! let expunged_user = user.expunge();
 //!
-//! let output = serde_json::to_string_pretty(&expungeed_user).expect("should serialize");
+//! let output = serde_json::to_string_pretty(&expunged_user).expect("should serialize");
 //!
 //! assert_eq!(
 //!   r#"{
@@ -51,7 +51,7 @@
 //!   "date_of_birth": "eeb98c815ae11240b563892c52c8735472bb8259e9a6477e179a9ea26e7a695a",
 //!   "latitude": 0.0,
 //!   "longitude": 0.0,
-//!   "password_hash": "<expungeed>"
+//!   "password_hash": "<expunged>"
 //!}"#,
 //!   output,
 //! )
@@ -62,7 +62,7 @@
 //!
 //! | Attribute | Description                                                                                                                                             | Feature   |
 //! | ---       | ---                                                                                                                                                     | ---       |
-//! | `as`      | provide a value that this field should be set to when expungeed. e.g. `Default::default()` or `"<expungeed>".to_string()`                                 | -         |
+//! | `as`      | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
 //! | `with`    | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
 //! | `all`     | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                                | -         |
 //! | `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
@@ -131,8 +131,8 @@ where
     }
 }
 
-/// [Expunged] is a type guard that can be used to ensure that values have been expungeed. It is
-/// impossible to construct `Expunged<T>` with an unexpungeed T.
+/// [Expunged] is a type guard that can be used to ensure that values have been expunged. It is
+/// impossible to construct `Expunged<T>` with an unexpunged T.
 ///
 /// The
 ///
@@ -152,7 +152,7 @@ where
 /// do_stuff(pii.into());
 ///
 /// fn do_stuff(pii: Expunged<PII>) {
-///     println!("Some expungeed pii: {pii:?}");
+///     println!("Some expunged pii: {pii:?}");
 /// }
 /// ```
 pub struct Expunged<T>(T);

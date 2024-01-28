@@ -57,35 +57,35 @@ fn it_works_struct() {
 
     let original = user.clone();
 
-    let expungeed = user.expunge();
+    let expunged = user.expunge();
 
-    assert_eq!("", expungeed.first_name);
+    assert_eq!("", expunged.first_name);
     assert_eq!(
-        "", expungeed.location.city,
+        "", expunged.location.city,
         "it should expunge nested structs"
     );
 
     assert_eq!(
-        "", expungeed.initial_location.city,
+        "", expunged.initial_location.city,
         "it should expunge generic values"
     );
 
     assert_eq!(
         Some("".to_string()),
-        expungeed.middle_name,
+        expunged.middle_name,
         "it should expunge optional values"
     );
 
     assert_eq!(
-        "anon.", expungeed.last_name,
+        "anon.", expunged.last_name,
         "the `as` attribute can be used to provide a literal value"
     );
     assert_eq!(
-        "75f6ac468f71b588f1f6e5d10e468efffab086a9e440c378d8018a7b3ff28b45", expungeed.address,
+        "75f6ac468f71b588f1f6e5d10e468efffab086a9e440c378d8018a7b3ff28b45", expunged.address,
         "the `with` attribute can be used to hash etc"
     );
     assert_eq!(
-        original.id, expungeed.id,
+        original.id, expunged.id,
         "fields without the expunge attribute should be left as is"
     );
 }
@@ -108,10 +108,10 @@ fn it_works_unnamed_struct() {
         },
     );
 
-    let expungeed = user.expunge();
+    let expunged = user.expunge();
 
-    assert_eq!("Bob", expungeed.0);
-    assert_eq!("", expungeed.1.city,);
+    assert_eq!("Bob", expunged.0);
+    assert_eq!("", expunged.1.city,);
 }
 
 #[test]
@@ -153,35 +153,35 @@ fn it_works_struct_all() {
 
     let original = user.clone();
 
-    let expungeed = user.expunge();
+    let expunged = user.expunge();
 
-    assert_eq!("", expungeed.first_name);
+    assert_eq!("", expunged.first_name);
     assert_eq!(
-        "", expungeed.location.city,
+        "", expunged.location.city,
         "it should expunge nested structs"
     );
 
     assert_eq!(
-        "", expungeed.initial_location.city,
+        "", expunged.initial_location.city,
         "it should expunge generic values"
     );
 
     assert_eq!(
         Some("".to_string()),
-        expungeed.middle_name,
+        expunged.middle_name,
         "it should expunge optional values"
     );
 
     assert_eq!(
-        "anon.", expungeed.last_name,
+        "anon.", expunged.last_name,
         "the `as` attribute can be used to provide a literal value"
     );
     assert_eq!(
-        "75f6ac468f71b588f1f6e5d10e468efffab086a9e440c378d8018a7b3ff28b45", expungeed.address,
+        "75f6ac468f71b588f1f6e5d10e468efffab086a9e440c378d8018a7b3ff28b45", expunged.address,
         "the `with` attribute can be used to hash etc"
     );
     assert_eq!(
-        original.id, expungeed.id,
+        original.id, expunged.id,
         "fields without the expunge attribute should be left as is"
     );
 }
@@ -241,46 +241,46 @@ fn it_works_enum() {
 
     let item = SensitiveItem::Name("Bob".to_string(), 1);
 
-    let expungeed = item.expunge();
+    let expunged = item.expunge();
 
-    assert_eq!(SensitiveItem::Name("".to_string(), 1), expungeed);
+    assert_eq!(SensitiveItem::Name("".to_string(), 1), expunged);
 
     let item = SensitiveItem::BankDetails {
         account_number: 123,
     };
-    let expungeed = item.expunge();
-    assert_eq!(SensitiveItem::BankDetails { account_number: 0 }, expungeed);
+    let expunged = item.expunge();
+    assert_eq!(SensitiveItem::BankDetails { account_number: 0 }, expunged);
 
     let new_york = Location {
         city: "New York".to_string(),
     };
     let item = SensitiveItem::Location(new_york.clone());
 
-    let expungeed = item.expunge();
-    assert_eq!(SensitiveItem::Location(Location::default()), expungeed);
+    let expunged = item.expunge();
+    assert_eq!(SensitiveItem::Location(Location::default()), expunged);
 
     let item = SensitiveItem::Nested(SensitiveNested::Name("Alice".to_string(), 1), 99);
-    let expungeed = item.expunge();
+    let expunged = item.expunge();
     assert_eq!(
         SensitiveItem::Nested(SensitiveNested::Name("".to_string(), 1), 0),
-        expungeed
+        expunged
     );
 
     let boston = Location {
         city: "Boston".to_string(),
     };
     let item = SensitiveItem::LocationHistory(vec![new_york, boston]);
-    let expungeed = item.expunge();
+    let expunged = item.expunge();
     assert_eq!(
         SensitiveItem::LocationHistory(vec![Location::default(), Location::default()],),
-        expungeed
+        expunged
     );
 
     let item = SensitiveItem::Zeroizable(12309812);
-    let expungeed = item.expunge();
-    assert_eq!(SensitiveItem::Zeroizable(2147483647), expungeed);
+    let expunged = item.expunge();
+    assert_eq!(SensitiveItem::Zeroizable(2147483647), expunged);
 
     let item = SensitiveItem::ZeroizableString("my_password".to_string());
-    let expungeed = item.expunge();
-    assert_eq!(SensitiveItem::ZeroizableString("99".to_string()), expungeed);
+    let expunged = item.expunge();
+    assert_eq!(SensitiveItem::ZeroizableString("99".to_string()), expunged);
 }
