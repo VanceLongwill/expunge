@@ -72,8 +72,8 @@ yielding back exactly the same type.
 
 Since the same type is returned, introducing this crate should be completely frictionless. 
 This comes with the tradeoff that the user is now responsible for ensuring that `expunge()` 
-has been called when necessary. To make this more foolproof, this crate includes a type guard `Expungeed<T>` 
-that can only contain a expungeed `T`. Internally constructing `Expungeed<T>` calls `expunge()`, 
+has been called when necessary. To make this more foolproof, this crate includes a type guard `Expunged<T>` 
+that can only contain a expungeed `T`. Internally constructing `Expunged<T>` calls `expunge()`, 
 so it cannot be initialized with unexpungeed data.
 
 ## Similar crates

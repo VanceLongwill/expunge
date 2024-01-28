@@ -131,15 +131,15 @@ where
     }
 }
 
-/// [Expungeed] is a type guard that can be used to ensure that values have been expungeed. It is
-/// impossible to construct `Expungeed<T>` with an unexpungeed T.
+/// [Expunged] is a type guard that can be used to ensure that values have been expungeed. It is
+/// impossible to construct `Expunged<T>` with an unexpungeed T.
 ///
 /// The
 ///
 /// ### Usage
 ///
 /// ```rust
-/// use expunge::{Expunge, Expungeed};
+/// use expunge::{Expunge, Expunged};
 ///
 /// #[derive(Debug, Expunge)]
 /// struct PII {
@@ -151,29 +151,29 @@ where
 ///
 /// do_stuff(pii.into());
 ///
-/// fn do_stuff(pii: Expungeed<PII>) {
+/// fn do_stuff(pii: Expunged<PII>) {
 ///     println!("Some expungeed pii: {pii:?}");
 /// }
 /// ```
-pub struct Expungeed<T>(T);
+pub struct Expunged<T>(T);
 
-impl<T> From<T> for Expungeed<T>
+impl<T> From<T> for Expunged<T>
 where
     T: Expunge,
 {
     fn from(value: T) -> Self {
-        Expungeed(value.expunge())
+        Expunged(value.expunge())
     }
 }
 
 #[allow(dead_code)]
-impl<T> Expungeed<T> {
+impl<T> Expunged<T> {
     fn into_inner(self) -> T {
         self.0
     }
 }
 
-impl<T> Deref for Expungeed<T> {
+impl<T> Deref for Expunged<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -181,13 +181,13 @@ impl<T> Deref for Expungeed<T> {
     }
 }
 
-impl<T> DerefMut for Expungeed<T> {
+impl<T> DerefMut for Expunged<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T> std::fmt::Display for Expungeed<T>
+impl<T> std::fmt::Display for Expunged<T>
 where
     T: std::fmt::Display,
 {
@@ -196,7 +196,7 @@ where
     }
 }
 
-impl<T> std::fmt::Debug for Expungeed<T>
+impl<T> std::fmt::Debug for Expunged<T>
 where
     T: std::fmt::Debug,
 {
