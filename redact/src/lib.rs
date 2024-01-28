@@ -78,7 +78,6 @@ use std::{
 pub use redact_derive::*;
 
 pub mod primitives;
-pub use primitives::*;
 
 #[cfg(feature = "zeroize")]
 #[doc(hidden)]
