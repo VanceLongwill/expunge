@@ -174,7 +174,7 @@ fn parse_attributes(
                 } else if meta.path.is_ident(ALL) {
                     if !is_container {
                         return Err(syn::Error::new(
-                                meta.path.span(), 
+                                meta.path.span(),
                                 format!("`{ALL}` is not permitted on fields or variants, use #[expunge] instead"),
                         ));
                     }
