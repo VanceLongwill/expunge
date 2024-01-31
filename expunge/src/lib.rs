@@ -72,7 +72,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    ops::{Deref, DerefMut}, sync::Arc,
+    ops::{Deref, DerefMut},
 };
 
 pub use expunge_derive::*;
@@ -242,11 +242,15 @@ where
     }
 }
 
-impl<T> Expunge for Box<T> where T: Expunge {
+impl<T> Expunge for Box<T>
+where
+    T: Expunge,
+{
     fn expunge(self) -> Self
     where
-        Self: Sized {
-            Box::new((*self).expunge())
+        Self: Sized,
+    {
+        Box::new((*self).expunge())
     }
 }
 
