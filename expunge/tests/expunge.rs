@@ -284,3 +284,18 @@ fn it_works_enum() {
     let expunged = item.expunge();
     assert_eq!(SensitiveItem::ZeroizableString("99".to_string()), expunged);
 }
+
+#[test]
+fn it_returns_boxed() {
+    #[derive(Expunge)]
+    struct Location {
+        #[expunge]
+        city: String,
+    }
+
+    let location = Box::new(Location {
+        city: "New York".to_string(),
+    });
+
+    let _: Box<Location> = location.expunge();
+}
