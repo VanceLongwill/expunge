@@ -1,4 +1,102 @@
+use std::io::{BufReader, BufWriter, Read};
+use std::sync::Arc;
+
 use expunge::Expunge;
+use serde::Deserialize;
+
+#[test]
+fn it_derives_logging() {
+    use serde::Serialize;
+    use slog::{info, o, Drain, Logger};
+    use slog_derive::{SerdeValue, KV};
+    use std::sync::Mutex;
+
+    #[derive(Clone, Serialize, SerdeValue)]
+    pub struct WrappedLocation {
+        #[slog]
+        #[serde(flatten)]
+        location: Location,
+    }
+
+    #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
+    struct Location {
+        #[expunge]
+        city: String,
+    }
+
+    impl slog::Value for Location
+    where
+        Location: Clone,
+    {
+        fn serialize(
+            &self,
+            record: &slog::Record,
+            key: slog::Key,
+            serializer: &mut dyn slog::Serializer,
+        ) -> slog::Result {
+            let loc = WrappedLocation {
+                location: self.clone(),
+            };
+            slog::Value::serialize(&loc, record, key, serializer)
+        }
+    }
+
+    //impl slog::SerdeValue for Location {
+    //    fn as_serde(&self) -> &dyn erased_serde::Serialize {
+    //        let loc = &WrappedLocation {
+    //            location: self.clone(),
+    //        };
+    //        loc.as_serde()
+    //    }
+
+    //    fn to_sendable(&self) -> Box<dyn slog::SerdeValue + Send + 'static> {
+    //        WrappedLocation {
+    //            location: self.clone(),
+    //        }
+    //        .to_sendable()
+    //    }
+    //}
+
+    let loc = WrappedLocation {
+        location: Location {
+            city: "New York".to_string(),
+        },
+    };
+
+    #[derive(Default, Clone)]
+    struct Buf(Arc<Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Buf {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().write(buf)
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.0.lock().unwrap().flush()
+        }
+    }
+
+    impl Buf {
+        fn inner(&self) -> Vec<u8> {
+            self.0.lock().unwrap().to_vec()
+        }
+    }
+
+    let buf = Buf::default();
+    let decorator = slog_json::Json::default(buf.clone());
+    let drain = Mutex::new(decorator).fuse();
+    let logger = Logger::root(drain, o!());
+
+    info!(logger, "it should log"; "location" => loc.clone());
+
+    #[derive(Deserialize)]
+    struct Log {
+        location: Location,
+    }
+    let got: Log = serde_json::from_slice(buf.inner().as_slice()).unwrap();
+
+    assert_eq!(loc.location, got.location);
+}
 
 #[test]
 fn it_works_struct() {

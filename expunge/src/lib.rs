@@ -79,6 +79,9 @@ pub use expunge_derive::*;
 
 pub mod primitives;
 
+/// A collection of utils for common ways to expunge things
+pub mod utils;
+
 #[cfg(feature = "zeroize")]
 #[doc(hidden)]
 pub use ::zeroize;

@@ -31,6 +31,9 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     };
     let name = input.ident;
 
+    // @TODO: add trait bound for serde
+    //input.generics.make_where_clause().predicates;
+
     let generics = add_trait_bounds(input.generics);
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -42,6 +45,15 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                 #impls
             }
         }
+
+        //struct Sloggable #ty_generics (#name #ty_generics);
+
+        //impl #impl_generics slog::KV for #name #ty_generics #where_clause {
+        //    fn serialize(&self, record: &slog::Record, serializer: &mut dyn slog::Serializer) -> slog::Result {
+
+        //        Ok(())
+        //    }
+        //}
     };
 
     Ok(expanded)
@@ -64,6 +76,7 @@ struct Builder {
     ignore: bool,
     all: bool,
     zeroize: bool,
+    slog: bool,
 }
 
 impl Builder {
@@ -74,6 +87,7 @@ impl Builder {
             ignore,
             all: _,
             zeroize,
+            slog,
         } = self;
         if ignore {
             return Ok(TokenStream::default());
@@ -112,6 +126,7 @@ const AS: &str = "as";
 const ALL: &str = "all";
 const IGNORE: &str = "ignore";
 const ZEROIZE: &str = "zeroize";
+const SLOG: &str = "slog";
 
 fn parse_attributes(
     span: Span,
@@ -239,6 +254,7 @@ fn derive_fields(
                         ignore,
                         all,
                         zeroize,
+                        slog,
                     } = f;
                     let (expunge_as, expunge_with) = match (expunge_as, expunge_with) {
                         (Some(ra), None) => (Some(ra), None),
@@ -257,6 +273,7 @@ fn derive_fields(
                         ignore,
                         all,
                         zeroize,
+                        slog,
                     })
                 })
                 .transpose()?;
