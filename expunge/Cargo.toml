@@ -32,7 +32,6 @@ slog = { version = "2.7.0", features = ["nested-values"] }
 erased-serde = "0.3"
 slog-term = "2.9"
 slog-json = { version = "2.6", features = ["nested-values"] }
-bytes = "1.5.0"
 
 [features]
 default = []
