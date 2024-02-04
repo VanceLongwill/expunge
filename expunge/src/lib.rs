@@ -64,9 +64,10 @@
 //! | ---       | ---                                                                                                                                                     | ---       |
 //! | `as`      | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
 //! | `with`    | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
-//! | `all`     | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                                | -         |
+//! | `all`     | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                               | -         |
 //! | `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
 //! | `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
+//! | `slog`    | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
 //!
 //!
 

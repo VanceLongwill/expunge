@@ -2,8 +2,10 @@ use expunge::Expunge;
 use serde::Deserialize;
 
 mod buf {
+    use std::io::{BufRead, BufReader};
     use std::sync::{Arc, Mutex};
 
+    /// Simple in memory buffer for testing logs
     #[derive(Default, Clone)]
     pub struct Buf(Arc<Mutex<Vec<u8>>>);
 
@@ -20,6 +22,12 @@ mod buf {
     impl Buf {
         pub fn inner(&self) -> Vec<u8> {
             self.0.lock().unwrap().to_vec()
+        }
+
+        pub fn lines(&self) -> Vec<String> {
+            let raw = self.inner();
+            let output = BufReader::new(raw.as_slice());
+            output.lines().collect::<Result<Vec<String>, _>>().unwrap()
         }
     }
 }
@@ -54,12 +62,77 @@ fn it_derives_logging_with_slog() {
     struct Log {
         location: Location,
     }
-    let got: Log = serde_json::from_slice(buf.inner().as_slice()).unwrap();
 
+    let lines = buf.lines();
+    println!("{}", lines.join("\n"));
+
+    let got: Log = serde_json::from_str(&lines[0]).unwrap();
     assert_eq!(
         loc.clone().expunge(),
         got.location,
         "the slogged value should be expunged"
+    );
+}
+
+#[test]
+fn it_derives_logging_with_slog_enum() {
+    use crate::buf::Buf;
+    use serde::Serialize;
+    use slog::{info, o, Drain, Logger};
+    use slog_derive::SerdeValue;
+    use std::sync::Mutex;
+
+    #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
+    #[expunge(slog)]
+    #[serde(rename_all = "snake_case")]
+    enum LocationType {
+        #[expunge(as = "<expunged>".to_string())]
+        City(String),
+        #[expunge]
+        Address {
+            #[expunge(as = "line1".to_string())]
+            line1: String,
+            #[expunge(as = "line2".to_string())]
+            line2: String,
+            #[expunge(as = "line3".to_string())]
+            line3: String,
+        },
+    }
+
+    let buf = Buf::default();
+    let decorator = slog_json::Json::default(buf.clone());
+    let drain = Mutex::new(decorator).fuse();
+    let logger = Logger::root(drain, o!());
+
+    let city = LocationType::City("New York".to_string());
+    info!(logger, "it should log city"; "location" => city.clone());
+    let address = LocationType::Address {
+        line1: "101 Some street".to_string(),
+        line2: "Some Town".to_string(),
+        line3: "Some Province".to_string(),
+    };
+    info!(logger, "it should log address"; "location" => address.clone());
+
+    #[derive(Deserialize)]
+    struct Log {
+        location: LocationType,
+    }
+
+    let lines = buf.lines();
+    println!("{}", lines.join("\n"));
+
+    let got: Log = serde_json::from_str(&lines[0]).unwrap();
+    assert_eq!(
+        city.clone().expunge(),
+        got.location,
+        "the slogged value for city should be expunged"
+    );
+
+    let got: Log = serde_json::from_str(&lines[1]).unwrap();
+    assert_eq!(
+        address.clone().expunge(),
+        got.location,
+        "the slogged value for address should be expunged"
     );
 }
 
