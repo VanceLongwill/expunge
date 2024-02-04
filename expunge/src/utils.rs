@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 
 /// Removes the last IP octet that can be used to identify an individual vs a location
-/// 
+///
 /// Example:
 ///
 /// 123.89.46.72 -> 123.89.46.0

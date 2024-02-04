@@ -25,47 +25,18 @@ mod buf {
 }
 
 #[test]
-fn it_derives_logging() {
+fn it_derives_logging_with_slog() {
     use crate::buf::Buf;
     use serde::Serialize;
     use slog::{info, o, Drain, Logger};
     use slog_derive::SerdeValue;
     use std::sync::Mutex;
 
-    //#[derive(Clone, Serialize, SerdeValue)]
-    //pub struct Wrapped {
-    //    #[slog]
-    //    #[serde(flatten)]
-    //    item: Location,
-    //}
-
     #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
+    #[expunge(slog)]
     struct Location {
-        #[expunge]
+        #[expunge(as = "<expunged>".to_string())]
         city: String,
-    }
-
-    impl slog::Value for Location
-    where
-        Location: Expunge + Clone + Serialize,
-    {
-        fn serialize(
-            &self,
-            record: &slog::Record,
-            key: slog::Key,
-            serializer: &mut dyn slog::Serializer,
-        ) -> slog::Result {
-            #[derive(Clone, Serialize, SerdeValue)]
-            pub struct Wrapped {
-                #[slog]
-                #[serde(flatten)]
-                item: Location,
-            }
-            let loc = Wrapped {
-                item: self.clone(),
-            };
-            slog::Value::serialize(&loc, record, key, serializer)
-        }
     }
 
     let loc = Location {
@@ -85,7 +56,11 @@ fn it_derives_logging() {
     }
     let got: Log = serde_json::from_slice(buf.inner().as_slice()).unwrap();
 
-    assert_eq!(loc, got.location);
+    assert_eq!(
+        loc.clone().expunge(),
+        got.location,
+        "the slogged value should be expunged"
+    );
 }
 
 #[test]
