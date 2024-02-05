@@ -33,7 +33,7 @@ slog-json = { version = "2.6", features = ["nested-values"] }
 
 [features]
 default = []
-all = ["zeroize"]
-zeroize = ["dep:zeroize", "dep:secrecy"]
-serde = ["dep:serde"]
-slog = ["dep:slog_derive", "dep:slog", "dep:erased-serde", "dep:serde"]
+all = ["zeroize", "serde", "slog"]
+zeroize = ["dep:zeroize", "dep:secrecy", "expunge_derive/zeroize"]
+serde = ["dep:serde", "expunge_derive/serde"]
+slog = ["dep:slog_derive", "dep:slog", "dep:erased-serde", "dep:serde", "expunge_derive/slog"]
