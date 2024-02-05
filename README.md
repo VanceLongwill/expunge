@@ -55,6 +55,8 @@ A crate for expunging/redacting and transforming sensitive fields.
  )
 ```
 
+#### Attributes
+
 | Attribute | Description                                                                                                                                             | Feature   |
 | ---       | ---                                                                                                                                                     | ---       |
 | `as`      | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
@@ -64,10 +66,13 @@ A crate for expunging/redacting and transforming sensitive fields.
 | `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
 | `slog`    | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
 
+### Logging with `slog`
 
-### Examples
+Expunge provides a painless and foolproof way to log structs that may contain sensitive fields. 
+As long as your type implements `serde::Serialize`, the `slog` attribute will derive `slog::SerdeValue`.
+Internally the value will be expunged before logging.
 
-#### `slog`
+#### Example
 
 ```rust
 #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)] // must implement Serialize
@@ -96,8 +101,8 @@ let address = LocationType::Address{
 };
 info!(logger, "it should log address"; "location" => address);
 
-// {"msg":"it should log city","level":"INFO","ts":"2024-02-04T12:55:28.627592Z","location":{"city":"<expunged>"}}
-// {"msg":"it should log address","level":"INFO","ts":"2024-02-04T12:55:28.627627Z","location":{"address":{"line1":"line1","line2":"line2"}}}
+// {"msg":"it should log city","location":{"city":"<expunged>"},"level":"INFO","ts":"2024-02-04T12:55:28.627592Z"}
+// {"msg":"it should log address","location":{"address":{"line1":"line1","line2":"line2"}},"level":"INFO","ts":"2024-02-04T12:55:28.627627Z"}
 ```
 
 
