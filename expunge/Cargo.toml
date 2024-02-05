@@ -1,6 +1,6 @@
 [package]
 name = "expunge"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description.workspace = true
 keywords.workspace = true
@@ -12,7 +12,7 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-expunge_derive = { version = "0.1.0", path = "../expunge_derive" }
+expunge_derive = { version = "0.2", path = "../expunge_derive" }
 zeroize = { version = "1.7.0", optional = true }
 secrecy = { version = "0.8.0", optional = true }
 serde = { version = "1.0", optional = true }
