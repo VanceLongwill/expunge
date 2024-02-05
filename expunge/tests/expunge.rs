@@ -1,6 +1,7 @@
 use expunge::Expunge;
 use serde::Deserialize;
 
+#[cfg(test)]
 mod buf {
     use std::io::{BufRead, BufReader};
     use std::sync::{Arc, Mutex};
@@ -37,7 +38,6 @@ fn it_derives_logging_with_slog() {
     use crate::buf::Buf;
     use serde::Serialize;
     use slog::{info, o, Drain, Logger};
-    use slog_derive::SerdeValue;
     use std::sync::Mutex;
 
     #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
@@ -52,8 +52,7 @@ fn it_derives_logging_with_slog() {
     };
 
     let buf = Buf::default();
-    let decorator = slog_json::Json::default(buf.clone());
-    let drain = Mutex::new(decorator).fuse();
+    let drain = Mutex::new(slog_json::Json::default(buf.clone())).fuse();
     let logger = Logger::root(drain, o!());
 
     info!(logger, "it should log"; "location" => loc.clone());
@@ -79,12 +78,10 @@ fn it_derives_logging_with_slog_enum() {
     use crate::buf::Buf;
     use serde::Serialize;
     use slog::{info, o, Drain, Logger};
-    use slog_derive::SerdeValue;
     use std::sync::Mutex;
 
     #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
     #[expunge(slog)]
-    #[serde(rename_all = "snake_case")]
     enum LocationType {
         #[expunge(as = "<expunged>".to_string())]
         City(String),
@@ -100,8 +97,7 @@ fn it_derives_logging_with_slog_enum() {
     }
 
     let buf = Buf::default();
-    let decorator = slog_json::Json::default(buf.clone());
-    let drain = Mutex::new(decorator).fuse();
+    let drain = Mutex::new(slog_json::Json::default(buf.clone())).fuse();
     let logger = Logger::root(drain, o!());
 
     let city = LocationType::City("New York".to_string());
