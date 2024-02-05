@@ -34,14 +34,15 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let name = input.ident;
 
     let generics = add_trait_bounds(input.generics);
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let g = generics.clone();
+    let (impl_generics, ty_generics, where_clause) = g.split_for_impl();
 
     let slog_impl = if slog_enabled {
+        let generics = add_slog_trait_bounds(generics);
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
         quote! {
-                impl #impl_generics slog::Value for #name #ty_generics
-                where
-                    #name: Expunge + Clone + ::serde::Serialize,
-                {
+                impl #impl_generics ::slog::Value for #name #ty_generics #where_clause {
                     fn serialize(
                         &self,
                         record: &::slog::Record,
@@ -57,10 +58,10 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                             #[serde(flatten)]
                             item: #name,
                         }
-                        let loc = Wrapped {
+                        let wrapped = Wrapped {
                             item: self.clone().expunge(),
                         };
-                        ::slog::Value::serialize(&loc, record, key, serializer)
+                        ::slog::Value::serialize(&wrapped, record, key, serializer)
                     }
                 }
         }
@@ -87,6 +88,16 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
             type_param.bounds.push(parse_quote!(expunge::Expunge));
+        }
+    }
+    generics
+}
+
+fn add_slog_trait_bounds(mut generics: Generics) -> Generics {
+    for param in &mut generics.params {
+        if let GenericParam::Type(ref mut type_param) = *param {
+            type_param.bounds.push(parse_quote!(::serde::Serialize));
+            type_param.bounds.push(parse_quote!(Clone));
         }
     }
     generics
