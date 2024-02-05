@@ -17,11 +17,17 @@ syn = { version = "2.0", features = ["extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 zeroize = { version = "1.7.0", optional = true }
+serde = { version = "1.0", features = ["derive"], optional = true }
+slog_derive = { version = "0.2.0", optional = true }
+slog = { version = "2.7.0", features = ["nested-values"], optional = true }
+erased-serde = { version = "0.3", optional = true }
 
 [lib]
 proc-macro = true
 
 [features]
 default = []
-all = ["zeroize"]
+all = ["zeroize", "slog"]
 zeroize = ["dep:zeroize"]
+serde = ["dep:serde"]
+slog = ["dep:slog_derive", "dep:slog", "dep:erased-serde", "dep:serde"]

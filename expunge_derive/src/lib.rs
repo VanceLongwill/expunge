@@ -19,6 +19,8 @@ pub fn expunge_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let span = input.span();
     let builder = parse_attributes(span, None, input.attrs)?.unwrap_or_default();
+    let slog_enabled = builder.slog;
+
     let impls = match input.data {
         Data::Struct(s) => derive_struct(s, builder)?,
         Data::Enum(e) => derive_enum(e, builder)?,
@@ -32,9 +34,44 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let name = input.ident;
 
     let generics = add_trait_bounds(input.generics);
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let g = generics.clone();
+    let (impl_generics, ty_generics, where_clause) = g.split_for_impl();
+
+    let slog_impl = if slog_enabled {
+        let generics = add_slog_trait_bounds(generics);
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+        quote! {
+                impl #impl_generics ::slog::Value for #name #ty_generics #where_clause {
+                    fn serialize(
+                        &self,
+                        record: &::slog::Record,
+                        key: ::slog::Key,
+                        serializer: &mut dyn ::slog::Serializer,
+                    ) -> slog::Result {
+                        use ::serde::Serialize;
+                        use ::slog_derive::SerdeValue;
+
+                        #[derive(Clone, Serialize, SerdeValue)]
+                        pub struct Wrapped {
+                            #[slog]
+                            #[serde(flatten)]
+                            item: #name,
+                        }
+                        let wrapped = Wrapped {
+                            item: self.clone().expunge(),
+                        };
+                        ::slog::Value::serialize(&wrapped, record, key, serializer)
+                    }
+                }
+        }
+    } else {
+        TokenStream::default()
+    };
 
     let expanded = quote! {
+        #slog_impl
+
         impl #impl_generics expunge::Expunge for #name #ty_generics #where_clause {
             fn expunge(self) -> Self {
                 use ::expunge::*;
@@ -47,7 +84,6 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     Ok(expanded)
 }
 
-// Add a bound `T: expunge::Expunge` to every type parameter T.
 fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
@@ -57,13 +93,30 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
     generics
 }
 
+fn add_slog_trait_bounds(mut generics: Generics) -> Generics {
+    for param in &mut generics.params {
+        if let GenericParam::Type(ref mut type_param) = *param {
+            type_param.bounds.push(parse_quote!(::serde::Serialize));
+            type_param.bounds.push(parse_quote!(Clone));
+        }
+    }
+    generics
+}
+
 #[derive(Debug, Clone, Default)]
 struct Builder {
+    // an expression to use as the expunged value
     expunge_as: Option<TokenStream>,
+    // an function that takes the un-expunged value and returns an expunged value
     expunge_with: Option<TokenStream>,
+    // ignore this field
     ignore: bool,
+    // expunge all fields in this container
     all: bool,
+    // zeroize the memory when expunging (only the current copy)
     zeroize: bool,
+    // implement slog::SerdeValue for this type, expunging the value before logging
+    slog: bool,
 }
 
 impl Builder {
@@ -74,6 +127,7 @@ impl Builder {
             ignore,
             all: _,
             zeroize,
+            slog: _,
         } = self;
         if ignore {
             return Ok(TokenStream::default());
@@ -112,6 +166,7 @@ const AS: &str = "as";
 const ALL: &str = "all";
 const IGNORE: &str = "ignore";
 const ZEROIZE: &str = "zeroize";
+const SLOG: &str = "slog";
 
 fn parse_attributes(
     span: Span,
@@ -202,8 +257,23 @@ fn parse_attributes(
                             format!("the `{ZEROIZE}` feature must be enabled"),
                         ))
                     }
-                }
-                else {
+                } else if meta.path.is_ident(SLOG) {
+                    if cfg!(feature = "slog") {
+                        if !is_container {
+                            return Err(syn::Error::new(
+                                    meta.path.span(),
+                                    format!("`{SLOG}` is not permitted on fields or variants"),
+                            ));
+                        }
+                        builder.slog = true;
+                        Ok(())
+                    } else {
+                        Err(syn::Error::new(
+                            meta.path.span(),
+                            format!("the `{SLOG}` feature must be enabled"),
+                        ))
+                    }
+                } else {
                     Err(syn::Error::new(
                         meta.path.span(),
                         format!("unrecognized option `{:?}`", meta.path),
@@ -239,6 +309,7 @@ fn derive_fields(
                         ignore,
                         all,
                         zeroize,
+                        slog,
                     } = f;
                     let (expunge_as, expunge_with) = match (expunge_as, expunge_with) {
                         (Some(ra), None) => (Some(ra), None),
@@ -257,6 +328,7 @@ fn derive_fields(
                         ignore,
                         all,
                         zeroize,
+                        slog,
                     })
                 })
                 .transpose()?;
