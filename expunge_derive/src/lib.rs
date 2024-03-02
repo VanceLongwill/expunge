@@ -167,6 +167,7 @@ const ALL: &str = "all";
 const IGNORE: &str = "ignore";
 const ZEROIZE: &str = "zeroize";
 const SLOG: &str = "slog";
+const DEFAULT: &str = "default";
 
 fn parse_attributes(
     span: Span,
@@ -273,6 +274,9 @@ fn parse_attributes(
                             format!("the `{SLOG}` feature must be enabled"),
                         ))
                     }
+                } else if meta.path.is_ident(DEFAULT) {
+                    builder.expunge_as = Some(quote!{ Default::default() });
+                    Ok(())
                 } else {
                     Err(syn::Error::new(
                         meta.path.span(),

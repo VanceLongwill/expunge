@@ -418,6 +418,95 @@ fn it_works_enum() {
 }
 
 #[test]
+fn it_works_enum_all() {
+    #[derive(PartialEq, Debug, Clone, Expunge)]
+    enum SensitiveNested {
+        Name(#[expunge] String, i32),
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct UnitStruct;
+
+    impl Expunge for UnitStruct {
+        fn expunge(self) -> Self
+        where
+            Self: Sized,
+        {
+            self
+        }
+    }
+
+    #[derive(PartialEq, Debug, Clone, Expunge)]
+    #[expunge(all)]
+    enum SensitiveItem {
+        Name(String, i32),
+        DateOfBirth(String),
+        BankDetails {
+            account_number: i32,
+        },
+        Location(Location),
+        Nested(SensitiveNested, i32),
+        LocationHistory(Vec<Location>),
+        WithUnit(i32, UnitStruct),
+        #[expunge(as = i32::MAX, zeroize)]
+        Zeroizable(i32),
+        #[expunge(as = "99".to_string(), zeroize)]
+        ZeroizableString(String),
+    }
+
+    #[derive(PartialEq, Debug, Clone, Expunge, Default)]
+    struct Location {
+        #[expunge]
+        city: String,
+    }
+
+    let item = SensitiveItem::Name("Bob".to_string(), 1);
+
+    let expunged = item.expunge();
+
+    assert_eq!(SensitiveItem::Name("".to_string(), 0), expunged);
+
+    let item = SensitiveItem::BankDetails {
+        account_number: 123,
+    };
+    let expunged = item.expunge();
+    assert_eq!(SensitiveItem::BankDetails { account_number: 0 }, expunged);
+
+    let new_york = Location {
+        city: "New York".to_string(),
+    };
+    let item = SensitiveItem::Location(new_york.clone());
+
+    let expunged = item.expunge();
+    assert_eq!(SensitiveItem::Location(Location::default()), expunged);
+
+    let item = SensitiveItem::Nested(SensitiveNested::Name("Alice".to_string(), 1), 99);
+    let expunged = item.expunge();
+    assert_eq!(
+        SensitiveItem::Nested(SensitiveNested::Name("".to_string(), 1), 0),
+        expunged
+    );
+
+    let boston = Location {
+        city: "Boston".to_string(),
+    };
+    let item = SensitiveItem::LocationHistory(vec![new_york, boston]);
+    let expunged = item.expunge();
+    assert_eq!(
+        SensitiveItem::LocationHistory(vec![Location::default(), Location::default()],),
+        expunged
+    );
+
+    let item = SensitiveItem::Zeroizable(12309812);
+    let expunged = item.expunge();
+    assert_eq!(SensitiveItem::Zeroizable(2147483647), expunged);
+
+    let item = SensitiveItem::ZeroizableString("my_password".to_string());
+    let expunged = item.expunge();
+    assert_eq!(SensitiveItem::ZeroizableString("99".to_string()), expunged);
+}
+
+#[test]
 fn it_returns_boxed() {
     #[derive(Expunge)]
     struct Location {
@@ -430,4 +519,27 @@ fn it_returns_boxed() {
     });
 
     let _: Box<Location> = location.expunge();
+}
+
+#[test]
+fn it_expunges_default() {
+    #[derive(Default)]
+    struct SomeData {
+        pub name: String,
+    }
+
+    #[derive(Expunge)]
+    struct Person {
+        #[expunge(default)]
+        data: SomeData,
+    }
+
+    let p = Person {
+        data: SomeData {
+            name: "John Smith".to_string(),
+        },
+    };
+
+
+    assert_eq!(String::default(), p.expunge().data.name);
 }
