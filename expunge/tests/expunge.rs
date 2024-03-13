@@ -1,6 +1,6 @@
 use expunge::Expunge;
-use serde::Deserialize;
 
+#[cfg(feature = "slog")]
 #[cfg(test)]
 mod buf {
     use std::io::{BufRead, BufReader};
@@ -33,9 +33,11 @@ mod buf {
     }
 }
 
+#[cfg(feature = "slog")]
 #[test]
 fn it_derives_logging_with_slog() {
     use crate::buf::Buf;
+    use serde::Deserialize;
     use serde::Serialize;
     use slog::{info, o, Drain, Logger};
     use std::sync::Mutex;
@@ -73,9 +75,93 @@ fn it_derives_logging_with_slog() {
     );
 }
 
+#[cfg(feature = "slog")]
+#[test]
+fn it_debug_disables_derives_logging_with_slog() {
+    use crate::buf::Buf;
+    use expunge::slog_debug::DisabledGuard;
+    use serde::Deserialize;
+    use serde::Serialize;
+    use slog::{info, o, Drain, Logger};
+    use std::sync::Mutex;
+
+    #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
+    #[expunge(slog)]
+    struct Location {
+        #[expunge(as = "<expunged>".to_string())]
+        city: String,
+    }
+
+    let loc = Location {
+        city: "New York".to_string(),
+    };
+
+    let buf = Buf::default();
+    let drain = Mutex::new(slog_json::Json::default(buf.clone())).fuse();
+    let logger = Logger::root(drain, o!());
+
+    let guard = DisabledGuard::new(true);
+
+    info!(logger, "it should log un-expunged"; "location" => loc.clone());
+    drop(guard);
+    info!(logger, "it should log expunged"; "location" => loc.clone());
+    let _guard1 = DisabledGuard::new(true);
+    info!(logger, "it should log un-expunged"; "location" => loc.clone());
+    {
+        let _guard2 = DisabledGuard::new(false);
+        info!(logger, "it should log expunged"; "location" => loc.clone());
+    }
+    info!(logger, "it should log un-expunged"; "location" => loc.clone());
+
+    #[derive(Deserialize)]
+    struct Log {
+        location: Location,
+    }
+
+    let lines = buf.lines();
+    println!("{}", lines.join("\n"));
+
+    let got: Log = serde_json::from_str(&lines[0]).unwrap();
+    assert_eq!(
+        loc.clone(),
+        got.location,
+        "the slogged value should NOT be expunged"
+    );
+
+    let got: Log = serde_json::from_str(&lines[1]).unwrap();
+    assert_eq!(
+        loc.clone().expunge(),
+        got.location,
+        "the slogged value should be expunged"
+    );
+
+    let got: Log = serde_json::from_str(&lines[2]).unwrap();
+    assert_eq!(
+        loc.clone(),
+        got.location,
+        "the slogged value should NOT be expunged"
+    );
+
+    let got: Log = serde_json::from_str(&lines[3]).unwrap();
+    assert_eq!(
+        loc.clone().expunge(),
+        got.location,
+        "the slogged value should be expunged"
+    );
+
+    let got: Log = serde_json::from_str(&lines[4]).unwrap();
+    assert_eq!(
+        loc.clone(),
+        got.location,
+        "the slogged value should NOT be expunged"
+    );
+}
+
+#[cfg(feature = "slog")]
 #[test]
 fn it_derives_logging_with_slog_enum() {
     use crate::buf::Buf;
+    use serde::Deserialize;
     use serde::Serialize;
     use slog::{info, o, Drain, Logger};
     use std::sync::Mutex;
@@ -318,6 +404,7 @@ fn it_works_struct_all() {
     );
 }
 
+#[cfg(feature = "zeroize")]
 #[test]
 fn it_works_enum() {
     #[derive(PartialEq, Debug, Clone, Expunge)]
@@ -417,6 +504,7 @@ fn it_works_enum() {
     assert_eq!(SensitiveItem::ZeroizableString("99".to_string()), expunged);
 }
 
+#[cfg(feature = "zeroize")]
 #[test]
 fn it_works_enum_all() {
     #[derive(PartialEq, Debug, Clone, Expunge)]

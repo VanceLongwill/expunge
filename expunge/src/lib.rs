@@ -25,7 +25,7 @@
 //!   latitude: f64,
 //!   #[expunge]
 //!   longitude: f64,
-//!   #[expunge(as = "<expunged>".to_string(), zeroize)]
+//!   #[expunge(as = "<expunged>".to_string())]
 //!   password_hash: String,
 //! }
 //!
@@ -82,6 +82,9 @@ pub mod primitives;
 
 /// A collection of utils for common ways to expunge things
 pub mod utils;
+
+#[cfg(feature = "slog")]
+pub mod slog_debug;
 
 #[cfg(feature = "zeroize")]
 #[doc(hidden)]
