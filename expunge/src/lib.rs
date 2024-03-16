@@ -83,7 +83,7 @@ pub mod primitives;
 /// A collection of utils for common ways to expunge things
 pub mod utils;
 
-#[cfg(feature = "slog")]
+#[cfg(feature = "slog_debug")]
 pub mod slog_debug;
 
 #[cfg(feature = "zeroize")]

@@ -60,6 +60,11 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                             item: #name,
                         }
 
+
+                        #[cfg(not(feature = "slog_debug"))]
+                        let item = self.clone().expunge();
+
+                        #[cfg(feature = "slog_debug")]
                         let item = if is_disabled() {
                             self.clone()
                         } else {
