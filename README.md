@@ -57,14 +57,14 @@ A crate for expunging/redacting and transforming sensitive fields.
 
 #### Attributes
 
-| Attribute | Description                                                                                                                                             | Feature   |
-| ---       | ---                                                                                                                                                     | ---       |
-| `as`      | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
-| `with`    | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
-| `all`     | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                               | -         |
-| `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
-| `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
-| `slog`    | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
+| Attribute    | Description                                                                                                                                             | Feature   |
+| ---          | ---                                                                                                                                                     | ---       |
+| `as`         | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
+| `with`       | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+| `all`        | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                               | -         |
+| `ignore`     | can be used to skip fields in combination with `all`                                                                                                    | -         |
+| `zeroize`    | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
+| `slog`       | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
 
 ### Logging with `slog`
 
@@ -105,11 +105,35 @@ info!(logger, "it should log address"; "location" => address);
 // {"msg":"it should log address","location":{"address":{"line1":"line1","line2":"line2"}},"level":"INFO","ts":"2024-02-04T12:55:28.627627Z"}
 ```
 
+#### Toggling expunge at runtime
+
+> Requires feature `slog_debug`
+
+When working locally or in non-production environments, it may be useful to see the full values without expunging them.
+
+Expunge provides a way to do this **only when using slog**.
+
+```rust
+use expunge::slog_debug::DisabledGuard;
+
+// While _guard is not dropped, slog values will NOT be expunged.
+// dropping will revert back to the previous guard (or back to expunging if no previous is set).
+let _guard = DisabledGuard::new(true);
+
+info!(logger, "it should log address"; "location" => address);
+// {"msg":"it should log city without expunging","location":{"city":"New York"},"level":"INFO","ts":"2024-02-04T12:55:28.627592Z"}
+
+// The most recent guard takes precedence and can be used to revert back to expunging.
+// For example, you may want to override a global guard that is not available in the current scope.
+let _guard2 = DisabledGuard::new(false);
+// {"msg":"it should log city","location":{"city":"<expunged>"},"level":"INFO","ts":"2024-02-04T12:55:28.627592Z"}
+```
 
 ## About
 
 Other crates offer similar functionality, but either require types to be changed or 
 make it difficult for both the expunged and unexpunged data being used at runtime.
+
 
 This crate provides a proc_macro that implements the `Expunge` trait for the given type. 
 Fields annotated with `#[expunge]` are cleared when the `expunge()` method is called, 
