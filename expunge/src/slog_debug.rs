@@ -1,8 +1,11 @@
 use std::cell::RefCell;
+use std::sync::OnceLock;
 
 thread_local! {
     static TL_SCOPES: RefCell<Vec<bool>> = RefCell::new(Vec::new())
 }
+
+static DISABLED: OnceLock<bool> = OnceLock::new();
 
 /// A type guard for disabling expunging within slog. Other calls to expunge will be unaffected.
 pub struct DisabledGuard;
@@ -33,12 +36,17 @@ impl Drop for DisabledGuard {
     }
 }
 
+pub fn disable_globally() -> Result<(), bool> {
+    DISABLED.set(true)
+}
+
 pub fn is_disabled() -> bool {
-    TL_SCOPES.with(|s| {
-        let s = s.borrow();
-        match s.last() {
-            Some(disabled) => *disabled,
-            None => false,
-        }
-    })
+    DISABLED.get().copied().unwrap_or_default()
+        || TL_SCOPES.with(|s| {
+            let s = s.borrow();
+            match s.last() {
+                Some(disabled) => *disabled,
+                None => false,
+            }
+        })
 }
