@@ -51,6 +51,7 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                     ) -> slog::Result {
                         use ::serde::Serialize;
                         use ::slog_derive::SerdeValue;
+                        use ::expunge::slog_debug::is_disabled;
 
                         #[derive(Clone, Serialize, SerdeValue)]
                         pub struct Wrapped {
@@ -58,8 +59,20 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                             #[serde(flatten)]
                             item: #name,
                         }
+
+
+                        #[cfg(not(feature = "slog_debug"))]
+                        let item = self.clone().expunge();
+
+                        #[cfg(feature = "slog_debug")]
+                        let item = if is_disabled() {
+                            self.clone()
+                        } else {
+                            self.clone().expunge()
+                        };
+
                         let wrapped = Wrapped {
-                            item: self.clone().expunge(),
+                            item,
                         };
                         ::slog::Value::serialize(&wrapped, record, key, serializer)
                     }
