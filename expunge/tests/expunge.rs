@@ -40,7 +40,7 @@ fn it_derives_logging_with_slog() {
     use slog::{info, o, Drain, Logger};
     use std::sync::Mutex;
 
-    #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
+    #[derive(Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
     #[expunge(slog)]
     struct Location {
         #[expunge(as = "<expunged>".to_string())]
@@ -80,7 +80,7 @@ fn it_derives_logging_with_slog_enum() {
     use slog::{info, o, Drain, Logger};
     use std::sync::Mutex;
 
-    #[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
+    #[derive(Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)]
     #[expunge(slog)]
     enum LocationType {
         #[expunge(as = "<expunged>".to_string())]
@@ -320,12 +320,12 @@ fn it_works_struct_all() {
 
 #[test]
 fn it_works_enum() {
-    #[derive(PartialEq, Debug, Clone, Expunge)]
+    #[derive(PartialEq, Clone, Expunge)]
     enum SensitiveNested {
         Name(#[expunge] String, i32),
     }
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, PartialEq)]
     struct UnitStruct;
 
     impl Expunge for UnitStruct {
@@ -337,7 +337,7 @@ fn it_works_enum() {
         }
     }
 
-    #[derive(PartialEq, Debug, Clone, Expunge)]
+    #[derive(PartialEq, Clone, Expunge)]
     enum SensitiveItem {
         Name(#[expunge] String, i32),
         DateOfBirth(String),
@@ -360,12 +360,12 @@ fn it_works_enum() {
         ZeroizableString(String),
     }
 
-    #[derive(PartialEq, Debug, Clone, Default)]
+    #[derive(PartialEq, Clone, Default)]
     struct Unexpungeable {
         name: String,
     }
 
-    #[derive(PartialEq, Debug, Clone, Expunge, Default)]
+    #[derive(PartialEq, Clone, Expunge, Default)]
     struct Location {
         #[expunge]
         city: String,
@@ -419,12 +419,12 @@ fn it_works_enum() {
 
 #[test]
 fn it_works_enum_all() {
-    #[derive(PartialEq, Debug, Clone, Expunge)]
+    #[derive(PartialEq, Clone, Expunge)]
     enum SensitiveNested {
         Name(#[expunge] String, i32),
     }
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, PartialEq)]
     struct UnitStruct;
 
     impl Expunge for UnitStruct {
@@ -436,7 +436,7 @@ fn it_works_enum_all() {
         }
     }
 
-    #[derive(PartialEq, Debug, Clone, Expunge)]
+    #[derive(PartialEq, Clone, Expunge)]
     #[expunge(all)]
     enum SensitiveItem {
         Name(String, i32),
@@ -454,7 +454,7 @@ fn it_works_enum_all() {
         ZeroizableString(String),
     }
 
-    #[derive(PartialEq, Debug, Clone, Expunge, Default)]
+    #[derive(PartialEq, Clone, Expunge, Default)]
     struct Location {
         #[expunge]
         city: String,
@@ -540,6 +540,34 @@ fn it_expunges_default() {
         },
     };
 
-
     assert_eq!(String::default(), p.expunge().data.name);
+}
+
+#[test]
+fn it_allows_or_prevents_debug() {
+    #[derive(Expunge)]
+    struct ExpungeDebug {
+        #[expunge]
+        pub name: String,
+    }
+
+    let expunge_debug = ExpungeDebug {
+        name: "John Smith".to_string(),
+    };
+    // debug is implemented by expunge
+    assert_eq!("<expunged>", format!("{expunge_debug:?}"));
+
+    #[derive(Debug, Expunge)]
+    #[expunge(allow_debug)]
+    struct CustomDebug {
+        #[expunge]
+        pub name: String,
+    }
+
+    let custom_debug = CustomDebug {
+        name: "John Smith".to_string(),
+    };
+    // debug is manually derived
+    assert_eq!(r#"CustomDebug { name: "John Smith" }"#, format!("{custom_debug:?}"));
+
 }

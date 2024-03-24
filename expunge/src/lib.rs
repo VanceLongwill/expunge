@@ -12,7 +12,7 @@
 //! use expunge::Expunge;
 //! use serde::{Serialize, Deserialize};
 //!
-//! #[derive(Clone, Debug, Serialize, Deserialize, Expunge)]
+//! #[derive(Clone, Serialize, Deserialize, Expunge)]
 //! struct User {
 //!   id: i64, // fields without #[expunge] annotations are left as is
 //!   #[expunge(as = "Randy".to_string())]
@@ -146,6 +146,7 @@ where
 /// use expunge::{Expunge, Expunged};
 ///
 /// #[derive(Debug, Expunge)]
+/// #[expunge(allow_debug)]
 /// struct PII {
 ///     #[expunge]
 ///     name: String,

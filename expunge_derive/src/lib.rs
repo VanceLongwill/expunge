@@ -20,6 +20,7 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let span = input.span();
     let builder = parse_attributes(span, None, input.attrs)?.unwrap_or_default();
     let slog_enabled = builder.slog;
+    let debug_allowed = builder.debug_allowed;
 
     let impls = match input.data {
         Data::Struct(s) => derive_struct(s, builder)?,
@@ -34,11 +35,24 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let name = input.ident;
 
     let generics = add_trait_bounds(input.generics);
-    let g = generics.clone();
-    let (impl_generics, ty_generics, where_clause) = g.split_for_impl();
+
+    let debug_impl = if !debug_allowed {
+        let generics = add_debug_trait_bounds(generics.clone());
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        quote! {
+            impl #impl_generics std::fmt::Debug for #name #ty_generics #where_clause {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    f.write_str("<expunged>")
+                }
+            }
+
+        }
+    } else {
+        TokenStream::default()
+    };
 
     let slog_impl = if slog_enabled {
-        let generics = add_slog_trait_bounds(generics);
+        let generics = add_slog_trait_bounds(generics.clone());
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         quote! {
@@ -69,8 +83,11 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
         TokenStream::default()
     };
 
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let expanded = quote! {
         #slog_impl
+
+        #debug_impl
 
         impl #impl_generics expunge::Expunge for #name #ty_generics #where_clause {
             fn expunge(self) -> Self {
@@ -88,6 +105,16 @@ fn add_trait_bounds(mut generics: Generics) -> Generics {
     for param in &mut generics.params {
         if let GenericParam::Type(ref mut type_param) = *param {
             type_param.bounds.push(parse_quote!(expunge::Expunge));
+        }
+    }
+    generics
+}
+
+fn add_debug_trait_bounds(mut generics: Generics) -> Generics {
+    for param in &mut generics.params {
+        if let GenericParam::Type(ref mut type_param) = *param {
+            type_param.bounds.push(parse_quote!(::std::fmt::Debug));
+            type_param.bounds.push(parse_quote!(Clone));
         }
     }
     generics
@@ -117,6 +144,9 @@ struct Builder {
     zeroize: bool,
     // implement slog::SerdeValue for this type, expunging the value before logging
     slog: bool,
+    // allow std::fmt::Debug to be derived/implemented. If this is not enabled then `Debug` is
+    // implemented by this macro.
+    debug_allowed: bool,
 }
 
 impl Builder {
@@ -128,6 +158,7 @@ impl Builder {
             all: _,
             zeroize,
             slog: _,
+            debug_allowed: _,
         } = self;
         if ignore {
             return Ok(TokenStream::default());
@@ -168,6 +199,7 @@ const IGNORE: &str = "ignore";
 const ZEROIZE: &str = "zeroize";
 const SLOG: &str = "slog";
 const DEFAULT: &str = "default";
+const ALLOW_DEBUG: &str = "allow_debug";
 
 fn parse_attributes(
     span: Span,
@@ -274,6 +306,15 @@ fn parse_attributes(
                             format!("the `{SLOG}` feature must be enabled"),
                         ))
                     }
+                } else if meta.path.is_ident(ALLOW_DEBUG) {
+                    if !is_container {
+                        return Err(syn::Error::new(
+                            meta.path.span(),
+                            format!("`{ALLOW_DEBUG}` is not permitted on fields or variants"),
+                        ));
+                    }
+                    builder.debug_allowed = true;
+                    Ok(())
                 } else if meta.path.is_ident(DEFAULT) {
                     builder.expunge_as = Some(quote!{ Default::default() });
                     Ok(())
@@ -314,6 +355,7 @@ fn derive_fields(
                         all,
                         zeroize,
                         slog,
+                        debug_allowed,
                     } = f;
                     let (expunge_as, expunge_with) = match (expunge_as, expunge_with) {
                         (Some(ra), None) => (Some(ra), None),
@@ -333,6 +375,7 @@ fn derive_fields(
                         all,
                         zeroize,
                         slog,
+                        debug_allowed,
                     })
                 })
                 .transpose()?;

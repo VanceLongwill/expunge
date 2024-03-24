@@ -57,14 +57,15 @@ A crate for expunging/redacting and transforming sensitive fields.
 
 #### Attributes
 
-| Attribute | Description                                                                                                                                             | Feature   |
-| ---       | ---                                                                                                                                                     | ---       |
-| `as`      | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
-| `with`    | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
-| `all`     | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                               | -         |
-| `ignore`  | can be used to skip fields in combination with `all`                                                                                                    | -         |
-| `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
-| `slog`    | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
+| Attribute     | Description                                                                                                                                             | Feature   |
+| ---           | ---                                                                                                                                                     | ---       |
+| `as`          | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
+| `with`        | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+| `all`         | can be used instead of specifying `#[expunge]` on every field/variant in a struct or enum                                                               | -         |
+| `ignore`      | can be used to skip fields in combination with `all`                                                                                                    | -         |
+| `allow_debug` | allows the user to implement `std::fmt::Debug` themselves. Otherwise expunge derives a no-op Debug implementation.                                      | -         |
+| `zeroize`     | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
+| `slog`        | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
 
 ### Logging with `slog`
 
@@ -75,7 +76,7 @@ Internally the value will be expunged before logging.
 #### Example
 
 ```rust
-#[derive(Debug, Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)] // must implement Serialize
+#[derive(Clone, Expunge, Deserialize, Serialize, PartialEq, Eq)] // must implement Serialize
 #[expunge(slog)]
 #[serde(rename_all = "snake_case")]
 enum LocationType {
@@ -131,13 +132,13 @@ so it cannot be initialized with unexpunged data.
 
 ### Comparison
 
-| crate                                         | proc_macro         | implements Display/Debug | serde support      | toggle on/off at runtime | uses original types | slog support       |
-| --                                            | -                  | -                        | -                  | -                        | -                   | -                  |
-| [secrecy](https://crates.io/crates/secrecy)   | :x:                | :white_check_mark:       | :white_check_mark: | :x:                      | :x:                 | :x:                |
-| [redact](https://crates.io/crates/redact)     | :x:                | :white_check_mark:       | :white_check_mark: | :x:                      | :x:                 | :x:                |
-| [veil](https://crates.io/crates/veil)         | :white_check_mark: | :white_check_mark:       | :x:                | :x:                      | :x:                 | :x:                |
-| [redacted](https://crates.io/crates/redacted) | :x:                | :white_check_mark:       | :x:                | :x:                      | :x:                 | :x:                |
-| [expunge](#Expunge)                           | :white_check_mark: | :x:                      | :white_check_mark: | :white_check_mark:       | :white_check_mark:  | :white_check_mark: |
+| crate                                         | proc_macro         | implements Debug   | serde support      | toggle on/off at runtime | uses original types | slog support       |
+| --                                            | -                  | -                  | -                  | -                        | -                   | -                  |
+| [secrecy](https://crates.io/crates/secrecy)   | :x:                | :white_check_mark: | :white_check_mark: | :x:                      | :x:                 | :x:                |
+| [redact](https://crates.io/crates/redact)     | :x:                | :white_check_mark: | :white_check_mark: | :x:                      | :x:                 | :x:                |
+| [veil](https://crates.io/crates/veil)         | :white_check_mark: | :white_check_mark: | :x:                | :x:                      | :x:                 | :x:                |
+| [redacted](https://crates.io/crates/redacted) | :x:                | :white_check_mark: | :x:                | :x:                      | :x:                 | :x:                |
+| [expunge](#Expunge)                           | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark:       | :white_check_mark:  | :white_check_mark: |
 
 
 ## Contributing
