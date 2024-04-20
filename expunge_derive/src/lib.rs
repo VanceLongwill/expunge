@@ -136,10 +136,8 @@ struct Builder {
     expunge_as: Option<TokenStream>,
     // an function that takes the un-expunged value and returns an expunged value
     expunge_with: Option<TokenStream>,
-    // ignore this field
-    ignore: bool,
-    // expunge all fields in this container
-    all: bool,
+    // skip this field
+    skip: bool,
     // zeroize the memory when expunging (only the current copy)
     zeroize: bool,
     // implement slog::SerdeValue for this type, expunging the value before logging
@@ -154,13 +152,12 @@ impl Builder {
         let Self {
             expunge_as,
             expunge_with,
-            ignore,
-            all: _,
+            skip,
             zeroize,
             slog: _,
             debug_allowed: _,
         } = self;
-        if ignore {
+        if skip {
             return Ok(TokenStream::default());
         }
 
@@ -194,8 +191,7 @@ impl Builder {
 
 const WITH: &str = "with";
 const AS: &str = "as";
-const ALL: &str = "all";
-const IGNORE: &str = "ignore";
+const SKIP: &str = "skip";
 const ZEROIZE: &str = "zeroize";
 const SLOG: &str = "slog";
 const DEFAULT: &str = "default";
@@ -214,7 +210,7 @@ fn parse_attributes(
     let is_container = parent.is_none();
 
     match attrs.len() {
-        0 => Ok(parent.and_then(|p| if p.all { Some(p) } else { None })),
+        0 => Ok(parent),
         1 => {
             let attr = &attrs[0];
 
@@ -250,23 +246,14 @@ fn parse_attributes(
                     let expr: Expr = meta.value()?.parse()?;
                     builder.expunge_with = Some(expr.into_token_stream());
                     Ok(())
-                } else if meta.path.is_ident(IGNORE) {
+                } else if meta.path.is_ident(SKIP) {
                     if is_container {
                         return Err(syn::Error::new(
                             meta.path.span(),
-                            format!("`{IGNORE}` is not permitted on containers"),
+                            format!("`{SKIP}` is not permitted on containers"),
                         ));
                     }
-                    builder.ignore = true;
-                    Ok(())
-                } else if meta.path.is_ident(ALL) {
-                    if !is_container {
-                        return Err(syn::Error::new(
-                                meta.path.span(),
-                                format!("`{ALL}` is not permitted on fields or variants, use #[expunge] instead"),
-                        ));
-                    }
-                    builder.all = true;
+                    builder.skip = true;
                     Ok(())
                 } else if meta.path.is_ident(ZEROIZE) {
                     if cfg!(feature = "zeroize") {
@@ -351,8 +338,7 @@ fn derive_fields(
                     let Builder {
                         expunge_as,
                         expunge_with,
-                        ignore,
-                        all,
+                        skip,
                         zeroize,
                         slog,
                         debug_allowed,
@@ -365,14 +351,12 @@ fn derive_fields(
                             return Err(syn::Error::new(span, "`as` and `with` cannot be combined"))
                         }
                     };
-                    let ignore = ignore || parent.ignore;
-                    let all = all || parent.all;
+                    let skip = skip || parent.skip;
                     let zeroize = zeroize || parent.zeroize;
                     Ok(Builder {
                         expunge_as,
                         expunge_with,
-                        ignore,
-                        all,
+                        skip,
                         zeroize,
                         slog,
                         debug_allowed,
@@ -380,11 +364,7 @@ fn derive_fields(
                 })
                 .transpose()?;
 
-            let builder = if parent.all {
-                builder.or(Some(parent.clone()))
-            } else {
-                builder
-            };
+            let builder = builder.or(Some(parent.clone()));
 
             Ok(builder
                 .map(|builder| {
@@ -485,11 +465,6 @@ fn derive_enum(e: DataEnum, parent: Builder) -> Result<TokenStream, syn::Error> 
         .iter()
         .map(|variant| {
             let parent = parse_attributes(span, Some(parent.clone()), variant.attrs.clone())?
-                .map(|mut p| {
-                    // the `#[expunge]` tag on an enum variant is equivalent to `#[expunge(all)]`
-                    p.all = true;
-                    p
-                })
                 .unwrap_or(parent.clone());
 
             let prefix = if let Fields::Unnamed(..) = &variant.fields {

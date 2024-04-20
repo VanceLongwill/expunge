@@ -144,13 +144,14 @@ fn it_works_struct() {
         pub last_name: String,
         #[expunge(with = sha256::digest)]
         pub address: String,
+        #[expunge(skip)]
         pub id: u64,
         #[expunge]
         pub location: Location,
         #[expunge]
         pub initial_location: G,
         #[allow(dead_code)]
-        #[expunge(ignore)]
+        #[expunge(skip)]
         pub some_unit: UnitStruct,
     }
 
@@ -218,18 +219,17 @@ fn it_works_struct() {
     );
     assert_eq!(
         original.id, expunged.id,
-        "fields without the expunge attribute should be left as is"
+        "fields with the expunge skip attribute should be left as is"
     );
 }
 
 #[test]
 fn it_works_unnamed_struct() {
     #[derive(Expunge)]
-    struct User(String, #[expunge] Location);
+    struct User(#[expunge(skip)] String, Location);
 
     #[derive(Expunge)]
     struct Location {
-        #[expunge]
         city: String,
     }
 
@@ -249,7 +249,6 @@ fn it_works_unnamed_struct() {
 #[test]
 fn it_works_struct_all() {
     #[derive(Clone, Expunge)]
-    #[expunge(all)]
     struct User<G> {
         pub first_name: String,
         pub middle_name: Option<String>,
@@ -257,7 +256,7 @@ fn it_works_struct_all() {
         pub last_name: String,
         #[expunge(with = sha256::digest)]
         pub address: String,
-        #[expunge(ignore)]
+        #[expunge(skip)]
         pub id: u64,
         pub location: Location,
         pub initial_location: G,
@@ -314,7 +313,7 @@ fn it_works_struct_all() {
     );
     assert_eq!(
         original.id, expunged.id,
-        "fields without the expunge attribute should be left as is"
+        "fields with the expunge skip attribute should be left as is"
     );
 }
 
@@ -322,7 +321,7 @@ fn it_works_struct_all() {
 fn it_works_enum() {
     #[derive(PartialEq, Clone, Expunge)]
     enum SensitiveNested {
-        Name(#[expunge] String, i32),
+        Name(String, #[expunge(skip)] i32),
     }
 
     #[derive(Clone, PartialEq)]
@@ -339,18 +338,15 @@ fn it_works_enum() {
 
     #[derive(PartialEq, Clone, Expunge)]
     enum SensitiveItem {
-        Name(#[expunge] String, i32),
+        Name(String, #[expunge(skip)] i32),
+        #[expunge(skip)]
         DateOfBirth(String),
         BankDetails {
-            #[expunge]
             account_number: i32,
         },
-        Location(#[expunge] Location),
-        #[expunge]
+        Location(Location),
         Nested(SensitiveNested, i32),
-        #[expunge]
         LocationHistory(Vec<Location>),
-        #[expunge]
         WithUnit(i32, UnitStruct),
         #[expunge(as = Default::default())]
         DoesntImplementExpunge(Unexpungeable),
@@ -421,7 +417,7 @@ fn it_works_enum() {
 fn it_works_enum_all() {
     #[derive(PartialEq, Clone, Expunge)]
     enum SensitiveNested {
-        Name(#[expunge] String, i32),
+        Name(String, #[expunge(skip)] i32),
     }
 
     #[derive(Clone, PartialEq)]
@@ -437,7 +433,6 @@ fn it_works_enum_all() {
     }
 
     #[derive(PartialEq, Clone, Expunge)]
-    #[expunge(all)]
     enum SensitiveItem {
         Name(String, i32),
         DateOfBirth(String),
@@ -568,6 +563,8 @@ fn it_allows_or_prevents_debug() {
         name: "John Smith".to_string(),
     };
     // debug is manually derived
-    assert_eq!(r#"CustomDebug { name: "John Smith" }"#, format!("{custom_debug:?}"));
-
+    assert_eq!(
+        r#"CustomDebug { name: "John Smith" }"#,
+        format!("{custom_debug:?}")
+    );
 }
