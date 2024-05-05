@@ -568,6 +568,8 @@ fn it_allows_or_prevents_debug() {
         name: "John Smith".to_string(),
     };
     // debug is manually derived
-    assert_eq!(r#"CustomDebug { name: "John Smith" }"#, format!("{custom_debug:?}"));
-
+    assert_eq!(
+        r#"CustomDebug { name: "John Smith" }"#,
+        format!("{custom_debug:?}")
+    );
 }
