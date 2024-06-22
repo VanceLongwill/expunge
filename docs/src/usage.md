@@ -1,14 +1,6 @@
-# Expunge
+# Usage
 
-A crate for expunging/redacting and transforming sensitive fields.
-
-## Quick links
-
-- [Documentation (mdbook)](https://vancelongwill.github.io/expunge/)
-- [API reference (docs.rs)](https://docs.rs/expunge)
-- [crates.io](https://crates.io/crates/expunge)
-
-## In action
+## Basic usage
 
 ```rust
 use expunge::Expunge;
@@ -56,11 +48,3 @@ assert_eq!(r#"{
   output,
 )
 ```
-
-## Contributing
-
-- Ensure that all tests are passing 
-   ```sh
-   cargo test --all-features
-   ```
-- Open a PR/issue
