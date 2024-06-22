@@ -1,5 +1,5 @@
 use expunge::Expunge;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use slog::{info, o};
 use slog::{Drain, Logger};
 use std::sync::Mutex;
@@ -17,7 +17,7 @@ enum LocationType {
         line2: String,
     },
 }
- 
+
 fn main() {
     let buf = vec![];
     let drain = Mutex::new(slog_json::Json::default(buf)).fuse();
@@ -28,7 +28,7 @@ fn main() {
     let city = LocationType::City("New York".to_string());
     info!(logger, "it should log city"; "location" => city);
 
-    let address = LocationType::Address{
+    let address = LocationType::Address {
         line1: "101 Some street".to_string(),
         line2: "Some Town".to_string(),
     };
