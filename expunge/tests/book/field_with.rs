@@ -5,20 +5,20 @@ fn redact_first_char(mut s: String) -> String {
     s
 }
 
-fn char_count_of(s: String) -> String{
+fn char_count_of(s: String) -> String {
     s.len().to_string()
 }
 
 #[derive(Expunge)]
 #[cfg_attr(test, derive(Eq, PartialEq, Debug), expunge(allow_debug))]
 struct User {
-  username: String,
-  #[expunge(with = char_count_of)]
-  first_name: String,
-  #[expunge(with = redact_first_char)]
-  last_name: String,
-  #[expunge(with = sha256::digest)]
-  password: String,
+    username: String,
+    #[expunge(with = char_count_of)]
+    first_name: String,
+    #[expunge(with = redact_first_char)]
+    last_name: String,
+    #[expunge(with = sha256::digest)]
+    password: String,
 }
 
 #[test]
@@ -30,10 +30,14 @@ fn field_with() {
         password: "password123".to_string(),
     };
 
-    assert_eq!(User{
-        username: "".to_string(),
-        first_name: "4".to_string(),
-        last_name: "*oe".to_string(),
-        password: "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f".to_string(),
-    }, user.expunge());
+    assert_eq!(
+        User {
+            username: "".to_string(),
+            first_name: "4".to_string(),
+            last_name: "*oe".to_string(),
+            password: "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
+                .to_string(),
+        },
+        user.expunge()
+    );
 }
