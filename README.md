@@ -55,13 +55,36 @@ assert_eq!(r#"{
 
 #### Attributes
 
-| Attribute | Description                                                                                                                                             | Feature   |
-| ---       | ---                                                                                                                                                     | ---       |
-| `as`      | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
-| `with`    | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
-| `skip`    | can be used to skip fields that shouldn't be expunged                                                                                                   | -         |
-| `zeroize` | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
-| `slog`    | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
+##### Container attributes
+
+> attributes that apply to a struct or enum declaration
+
+- 
+
+| Attribute     | Description                                                                                                                                             | Feature   |
+| ---           | ---                                                                                                                                                     | ---       |
+| `as`          | provide a value that all the fields should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                             | -         |
+| `with`        | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+| `skip`        | can be used to skip fields that shouldn't be expunged                                                                                                   | -         |
+| `allow_debug` | allows the user to provide their own `Debug` implementation                                                                                             | -         |
+| `default`     | shorthand equivalent to `as = Default::default()`                                                                                                       | -         |
+| `zeroize`     | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
+| `slog`        | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
+
+##### Field & variant attributes
+ 
+> attributes that can be applied to a struct field, enum variant or field in an enum variant
+
+
+| Attribute     | Description                                                                                                                                             | Feature   |
+| ---           | ---                                                                                                                                                     | ---       |
+| `as`          | provide a value that this field should be set to when expunged. e.g. `Default::default()` or `"<expunged>".to_string()`                                 | -         |
+| `with`        | provide a function that will be called when expunging this value. It must return the same type as it takes. e.g. hash a `String` with `sha256::digest`. | -         |
+| `skip`        | can be used to skip fields that shouldn't be expunged                                                                                                   | -         |
+| `allow_debug` | allows the user to provide their own `Debug` implementation                                                                                             | -         |
+| `default`     | shorthand equivalent to `as = Default::default()`                                                                                                       | -         |
+| `zeroize`     | zeroize memory for extra security via the [secrecy](https://crates.io/crates/secrecy) & [zeroize](https://crates.io/crates/zeroize) crates              | `zeroize` |
+| `slog`        | integrates with [slog](https://crates.io/crates/slog) using [slog-derive](https://crates.io/crates/slog_derive) to automatically expunge fields in logs | `slog`    |
 
 ### Logging with `slog`
 
