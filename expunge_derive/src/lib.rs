@@ -52,13 +52,22 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                         use ::serde::Serialize;
                         use ::slog_derive::SerdeValue;
 
-                        #[derive(Clone, Serialize, SerdeValue)]
-                        pub struct Wrapped {
+                        #[derive(Clone, SerdeValue)]
+                        struct _expunge_internal_Wrapped {
                             #[slog]
-                            #[serde(flatten)]
                             item: #name,
                         }
-                        let wrapped = Wrapped {
+
+                        impl ::serde::Serialize for _expunge_internal_Wrapped {
+                            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                            where
+                                S: ::serde::Serializer,
+                            {
+                                self.item.serialize(serializer)
+                            }
+                        }
+
+                        let wrapped = _expunge_internal_Wrapped {
                             item: self.clone().expunge(),
                         };
                         ::slog::Value::serialize(&wrapped, record, key, serializer)
