@@ -16,7 +16,6 @@ expunge_derive = { version = "0.3.4", path = "../expunge_derive" }
 zeroize = { version = "1.7.0", optional = true }
 secrecy = { version = "0.8.0", optional = true }
 serde = { version = "1.0", optional = true }
-slog_derive = { version = "0.2.0", optional = true }
 slog = { version = "2.7.0", optional = true, features = ["nested-values"] }
 erased-serde = { version = "0.3", optional = true }
 
@@ -25,7 +24,6 @@ expunge_derive = { path = "../expunge_derive", features = ["all"] }
 sha256 = "1.4.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-slog_derive = "0.2.0"
 slog = { version = "2.7.0", features = ["nested-values"] }
 erased-serde = "0.3"
 slog-term = "2.9"
@@ -36,4 +34,4 @@ default = []
 all = ["zeroize", "serde", "slog"]
 zeroize = ["dep:zeroize", "dep:secrecy", "expunge_derive/zeroize"]
 serde = ["dep:serde", "expunge_derive/serde"]
-slog = ["dep:slog_derive", "dep:slog", "dep:erased-serde", "dep:serde", "expunge_derive/slog"]
+slog = ["dep:slog", "dep:erased-serde", "dep:serde", "expunge_derive/slog"]

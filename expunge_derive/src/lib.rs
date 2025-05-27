@@ -64,9 +64,8 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                         serializer: &mut dyn ::slog::Serializer,
                     ) -> slog::Result {
                         use ::serde::Serialize;
-                        use ::slog_derive::SerdeValue;
 
-                        #[derive(Clone, SerdeValue)]
+                        #[derive(Clone)]
                         struct _expunge_internal_Wrapped {
                             #[slog]
                             item: #name,
@@ -78,6 +77,22 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                                 S: ::serde::Serializer,
                             {
                                 self.item.serialize(serializer)
+                            }
+                        }
+
+                        impl ::slog::SerdeValue for _expunge_internal_Wrapped {
+                            fn as_serde(&self) -> &dyn ::erased_serde::Serialize {
+                                self
+                            }
+
+                            fn to_sendable(&self) -> Box<dyn ::slog::SerdeValue + Send + 'static>  {
+                                Box::new(self.clone())
+                            }
+                        }
+
+                        impl ::slog::Value for _expunge_internal_Wrapped {
+                            fn serialize(&self, _record: &::slog::Record, key: ::slog::Key, ser: &mut dyn ::slog::Serializer) -> ::slog::Result {
+                                ser.emit_serde(key, self)
                             }
                         }
 
