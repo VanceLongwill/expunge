@@ -62,12 +62,11 @@ fn try_expunge_derive(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                         record: &::slog::Record,
                         key: ::slog::Key,
                         serializer: &mut dyn ::slog::Serializer,
-                    ) -> slog::Result {
+                    ) -> ::slog::Result {
                         use ::serde::Serialize;
 
                         #[derive(Clone)]
                         struct _expunge_internal_Wrapped {
-                            #[slog]
                             item: #name,
                         }
 
